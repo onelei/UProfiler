@@ -1,0 +1,17 @@
+{
+    "name": "LemonFramework.UProfiler",
+    "rootNamespace": "LemonFramework.UProfiler",
+    "references": [
+        "Newtonsoft.Json",
+        "Unity.Profiling"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

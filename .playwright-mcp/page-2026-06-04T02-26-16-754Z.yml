@@ -1,0 +1,161 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "UProfiler" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - text: MAKE IT SIMPLE
+    - navigation [ref=e5]:
+      - link "首页" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - link "项目" [ref=e7] [cursor=pointer]:
+        - /url: /project/com.LemonFramework.UProfiler
+      - link "总体性能分析" [ref=e8] [cursor=pointer]:
+        - /url: /project/com.LemonFramework.UProfiler/performance
+  - main [ref=e10]:
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: Unity 性能监控报表
+        - heading "LemonFramework.UProfiler" [level=1] [ref=e14]
+        - paragraph [ref=e15]: 会话 2026_06_03_18_42_36 · 包名 com.LemonFramework.UProfiler
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: 平台
+          - text: WindowsEditor
+        - generic [ref=e19]:
+          - generic [ref=e20]: 版本
+          - text: "0.1"
+        - generic [ref=e21]:
+          - generic [ref=e22]: 测试时长
+          - text: 10秒
+        - generic [ref=e23]:
+          - generic [ref=e24]: 采样间隔
+          - text: 100 帧
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27]: 平均 FPS
+        - generic [ref=e28]: "59.6"
+        - generic [ref=e29]: 最低 59 / 最高 63
+      - generic [ref=e30]:
+        - generic [ref=e31]: Mono 峰值
+        - generic [ref=e32]: 657.9 MB
+        - generic [ref=e33]: Total 126.9 MB
+      - generic [ref=e34]:
+        - generic [ref=e35]: DrawCall 峰值
+        - generic [ref=e36]: "0"
+        - generic [ref=e37]: 三角面 0
+      - generic [ref=e38]:
+        - generic [ref=e39]: 诊断项
+        - generic [ref=e40]: "3"
+        - generic [ref=e41]: HIGH 1 / MED 0
+    - generic [ref=e42]:
+      - generic [ref=e43]: 总体性能趋势
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - generic [ref=e46]: 帧率报告
+          - generic [ref=e48]: 滚动到此处加载图表…
+        - generic [ref=e49]:
+          - generic [ref=e50]: 内存占用
+          - generic [ref=e52]: 滚动到此处加载图表…
+        - generic [ref=e53]:
+          - generic [ref=e54]: 渲染报告
+          - generic [ref=e56]: 滚动到此处加载图表…
+    - generic [ref=e57]:
+      - generic [ref=e58]: 性能诊断
+      - generic [ref=e59]:
+        - button "ALL" [ref=e60] [cursor=pointer]
+        - button "LOW" [ref=e61] [cursor=pointer]
+        - button "MEDIUM" [ref=e62] [cursor=pointer]
+        - button "HIGH" [ref=e63] [cursor=pointer]
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66] [cursor=pointer]:
+            - generic [ref=e67]:
+              - generic [ref=e68]: 整体 · 平均帧率
+              - generic [ref=e69]: 行业水平 行业水平 30 FPS · 推荐 UWA 推荐值 ≥ 30 FPS
+            - generic [ref=e71]: 59.6 FPS
+          - generic [ref=e72] [cursor=pointer]:
+            - generic [ref=e73]:
+              - generic [ref=e74]: 渲染模块 · DrawCall 峰值
+              - generic [ref=e75]: 行业水平 行业水平 200 · 推荐 UWA 推荐值 ≤ 200
+            - generic [ref=e77]: "0"
+          - generic [ref=e78] [cursor=pointer]:
+            - generic [ref=e79]:
+              - generic [ref=e80]: 内存 · Mono 堆内存峰值
+              - generic [ref=e81]: 行业水平 行业水平 80MB · 推荐 UWA 推荐值 ≤ 80MB
+            - generic [ref=e83]: 657.94 MB
+        - generic [ref=e84]:
+          - generic [ref=e85]: "优化优先级: LOW"
+          - heading "平均帧率" [level=3] [ref=e86]
+          - paragraph [ref=e87]: 本次测试平均帧率 59.6 FPS，最低 59 FPS，最高 63 FPS。
+          - paragraph [ref=e88]: UWA 建议
+          - list [ref=e89]:
+            - listitem [ref=e90]: 检查 CPU 主线程耗时，关注 Update/FixedUpdate 中的重逻辑。
+            - listitem [ref=e91]: 结合函数性能表定位平均耗时超过 15ms 的热点函数。
+            - listitem [ref=e92]: 在目标设备上关闭不必要的日志输出后再对比帧率。
+    - generic [ref=e93]:
+      - generic [ref=e94]: 基础与设备信息
+      - generic [ref=e95]:
+        - generic [ref=e96]:
+          - heading "测试信息" [level=3] [ref=e97]
+          - table [ref=e98]:
+            - rowgroup [ref=e99]:
+              - row "产品名 LemonFramework.UProfiler" [ref=e100]:
+                - rowheader "产品名" [ref=e101]
+                - cell "LemonFramework.UProfiler" [ref=e102]
+              - row "包名 com.LemonFramework.UProfiler" [ref=e103]:
+                - rowheader "包名" [ref=e104]
+                - cell "com.LemonFramework.UProfiler" [ref=e105]
+              - row "平台 WindowsEditor" [ref=e106]:
+                - rowheader "平台" [ref=e107]
+                - cell "WindowsEditor" [ref=e108]
+              - row "版本号 0.1" [ref=e109]:
+                - rowheader "版本号" [ref=e110]
+                - cell "0.1" [ref=e111]
+              - row "测试时长 10秒" [ref=e112]:
+                - rowheader "测试时长" [ref=e113]
+                - cell "10秒" [ref=e114]
+        - generic [ref=e115]:
+          - heading "设备信息" [level=3] [ref=e116]
+          - table [ref=e117]:
+            - rowgroup [ref=e118]:
+              - row "Unity 版本 2022.3.62f3" [ref=e119]:
+                - rowheader "Unity 版本" [ref=e120]
+                - cell "2022.3.62f3" [ref=e121]
+              - row "操作系统 Windows 10 (10.0.19044) 64bit" [ref=e122]:
+                - rowheader "操作系统" [ref=e123]
+                - cell "Windows 10 (10.0.19044) 64bit" [ref=e124]
+              - row "设备型号 B460MDS3HV2 (Gigabyte Technology Co., Ltd.)" [ref=e125]:
+                - rowheader "设备型号" [ref=e126]
+                - cell "B460MDS3HV2 (Gigabyte Technology Co., Ltd.)" [ref=e127]
+              - row "处理器 Intel(R) Core(TM) i5-10400F CPU @ 2.90GHz" [ref=e128]:
+                - rowheader "处理器" [ref=e129]
+                - cell "Intel(R) Core(TM) i5-10400F CPU @ 2.90GHz" [ref=e130]
+              - row "显卡 NVIDIA GeForce GTX 1660" [ref=e131]:
+                - rowheader "显卡" [ref=e132]
+                - cell "NVIDIA GeForce GTX 1660" [ref=e133]
+              - row "分辨率 983 x 583" [ref=e134]:
+                - rowheader "分辨率" [ref=e135]
+                - cell "983 x 583" [ref=e136]
+              - row "系统内存 65451 MB" [ref=e137]:
+                - rowheader "系统内存" [ref=e138]
+                - cell "65451 MB" [ref=e139]
+    - generic [ref=e140]:
+      - generic [ref=e141]: 函数性能分析
+      - paragraph [ref=e142]: 暂无函数性能数据。请在 Unity 菜单执行 Hook 注入并启用函数分析。
+    - generic [ref=e143]:
+      - generic [ref=e144]: 运行日志
+      - generic [ref=e146]: 共 5 行 · 分批加载
+      - generic [ref=e147]:
+        - generic [ref=e148]: "[2026/6/3 18:42:47]<font color=\"#0000FF\">[Log]停止监控</font>"
+        - generic [ref=e150]: stackTrace:UnityEngine.Debug:Log (object)
+        - generic [ref=e151]: LemonFramework.UProfiler.Components.UProfilerHost:UProfilerCallBackFunc (bool) (at ./Packages/com.lemonframework.uprofiler/Runtime/Scripts/Components/UProfilerHost.cs:179)
+        - generic [ref=e152]: LemonFramework.UProfiler.Components.UProfilerHost:OnGUI () (at ./Packages/com.lemonframework.uprofiler/Runtime/Scripts/Components/UProfilerHost.cs:486)
+    - generic [ref=e153]:
+      - link "返回首页" [ref=e154] [cursor=pointer]:
+        - /url: /
+      - text: ·
+      - link "项目" [ref=e155] [cursor=pointer]:
+        - /url: /project/com.LemonFramework.UProfiler
+      - text: ·
+      - link "报告列表" [ref=e156] [cursor=pointer]:
+        - /url: /project/com.LemonFramework.UProfiler/performance

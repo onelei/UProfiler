@@ -1,0 +1,31 @@
+{
+  "name": "com.lemonframework.uprofiler",
+  "version": "1.0.0",
+  "displayName": "LemonFramework UProfiler",
+  "description": "LemonFramework UProfiler: data collection, upload, and profiling helpers for Unity.",
+  "unity": "2022.3",
+  "author": {
+    "name": "LemonFramework"
+  },
+  "dependencies": {
+    "com.unity.nuget.mono-cecil": "1.11.6",
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "samples": [
+    {
+      "displayName": "File Upload",
+      "description": "HTTP file upload demo scene.",
+      "path": "Samples~/FileUpload"
+    },
+    {
+      "displayName": "Method Inject",
+      "description": "IL hook and function analysis demo.",
+      "path": "Samples~/MethodInject"
+    },
+    {
+      "displayName": "Android Interact",
+      "description": "Unity-Android JNI interaction demo.",
+      "path": "Samples~/AndroidInteract"
+    }
+  ]
+}

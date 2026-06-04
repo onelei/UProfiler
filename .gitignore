@@ -1,0 +1,55 @@
+# OS / IDE
+.DS_Store
+.idea/
+.vs/
+*.suo
+*.user
+*.opensdf
+*.sdf
+_ReSharper.CSharp/
+.localhistory/
+.settings/
+*.sln
+*.csproj
+
+# Build artifacts
+bin/
+Bin/
+obj/
+.objs/
+Release/
+/netcoreapp2.0
+
+# Unity (under UProfiler-Unity/)
+UProfiler-Unity/Library/
+UProfiler-Unity/Temp/
+UProfiler-Unity/Logs/
+UProfiler-Unity/UserSettings/
+UProfiler-Unity/*.apk
+UProfiler-Unity/.gradle
+UProfiler-Unity/Assets/StreamingAssets/
+UProfiler-Unity/Assets/StreamingAssets.meta
+
+# Legacy Unity DLL stash (optional local only)
+UProfiler-Unity/Lib/
+
+# Report server runtime data
+UProfiler-Server/uploads/
+UProfiler-Server/logs/
+UProfiler-Server/reports/
+UProfiler-Server/bin/
+UProfiler-Server/obj/
+
+# Legacy paths
+/Tools/
+/CSharp/
+/Excel/
+/Log
+/Temp
+/Logs
+/Library
+Server/
+Unity/
+
+# Binaries
+*.apk

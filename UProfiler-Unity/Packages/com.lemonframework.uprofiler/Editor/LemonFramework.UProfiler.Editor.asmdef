@@ -1,0 +1,21 @@
+{
+    "name": "LemonFramework.UProfiler.Editor",
+    "rootNamespace": "LemonFramework.UProfiler.Editor",
+    "references": [
+        "LemonFramework.UProfiler"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Mono.Cecil.dll",
+        "Mono.Cecil.Pdb.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

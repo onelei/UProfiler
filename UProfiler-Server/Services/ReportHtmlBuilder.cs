@@ -1,0 +1,424 @@
+using System.Globalization;
+using System.Net;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using UProfiler.Server.Models;
+
+namespace UProfiler.Server.Services;
+
+public static class ReportHtmlBuilder
+{
+    static readonly JsonSerializerOptions JsonCamelCase = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    static readonly JsonSerializerOptions JsonSafeHtml = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
+    public static string Build(ReportDataContext data)
+    {
+        var chartPayload = BuildChartPayload(data);
+        var diagnosisJson = JsonSerializer.Serialize(data.DiagnosisItems, JsonCamelCase);
+        var funcJson = BuildFuncJson(data);
+        var logJson = JsonSerializer.Serialize(data.LogLines, JsonSafeHtml);
+        var productName = data.TestInfo?.ProductName ?? "UProfiler 性能报告";
+        var reportTitle = $"{productName} - 性能分析报告";
+        var packageName = data.TestInfo?.PackageName ?? data.PackageName;
+        var hasPower = HasPowerData(data);
+        var hasPss = HasPssData(data);
+
+        var sb = new StringBuilder();
+        sb.Append("<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\" />");
+        sb.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />");
+        sb.Append("<title>").Append(WebUtility.HtmlEncode(reportTitle)).Append("</title>");
+        sb.Append("<link rel=\"stylesheet\" href=\"").Append(StaticAssets.Css("portal.css")).Append("\" />");
+        sb.Append("<link rel=\"stylesheet\" href=\"").Append(StaticAssets.Css("report.css")).Append("\" />");
+        sb.Append("</head><body>");
+
+        sb.Append(PortalHtmlBuilder.BuildTopNav(
+            PortalHtmlBuilder.NavTab.Report,
+            string.IsNullOrWhiteSpace(packageName) ? null : packageName));
+        sb.Append("<div class=\"layout\">");
+        sb.Append(BuildSidebar());
+        sb.Append("<main class=\"main\">");
+        sb.Append(BuildHeader(data, productName));
+        sb.Append(BuildSummaryCards(data));
+        sb.Append("<section id=\"trend\" class=\"section\"><div class=\"section-title\">总体性能趋势</div>");
+        sb.Append(BuildDownsampleNote(chartPayload));
+        sb.Append("<div class=\"chart-grid\">");
+        sb.Append(BuildChartCard("fpsChart", "fps", "帧率报告"));
+        sb.Append(BuildChartCard("memoryChart", "memory", "内存占用"));
+        sb.Append(BuildChartCard("renderChart", "render", "渲染报告"));
+        if (hasPower)
+        {
+            sb.Append(BuildChartCard("powerChart", "power", "温度与功耗"));
+        }
+        if (hasPss)
+        {
+            sb.Append(BuildChartCard("pssChart", "pss", "PSS 内存"));
+        }
+        sb.Append("</div></section>");
+
+        sb.Append("""
+<section id="diagnosis" class="section"><div class="section-title">性能诊断</div>
+<div class="diag-toolbar">
+<button class="filter-btn active" data-filter="ALL">ALL</button>
+<button class="filter-btn low" data-filter="LOW">LOW</button>
+<button class="filter-btn medium" data-filter="MEDIUM">MEDIUM</button>
+<button class="filter-btn high" data-filter="HIGH">HIGH</button>
+</div><div class="diag-layout">
+<div id="diagList" class="diag-list"></div>
+<div id="diagDetail" class="diag-detail"></div>
+</div></section>
+""");
+
+        sb.Append(BuildInfoSection(data));
+        sb.Append(BuildFuncSection(data, funcJson));
+        sb.Append(BuildLogSection(data, logJson));
+        sb.Append("<footer class=\"footer\"><a href=\"/\">返回首页</a>");
+        if (!string.IsNullOrWhiteSpace(packageName))
+        {
+            var pkgUrl = ProjectCatalog.EncodePackage(packageName);
+            sb.Append(" · <a href=\"/project/").Append(pkgUrl).Append("\">项目</a>");
+            sb.Append(" · <a href=\"/project/").Append(pkgUrl).Append("/performance\">报告列表</a>");
+        }
+        sb.Append("</footer>");
+        sb.Append("</main></div>");
+
+        sb.Append("<script>window.chartPayload=").Append(chartPayload).Append(";</script>");
+        sb.Append("<script>window.diagnosisItems=").Append(diagnosisJson).Append(";</script>");
+        sb.Append("<script defer src=\"").Append(StaticAssets.Js("report.js")).Append("\"></script>");
+        sb.Append("</body></html>");
+        return sb.ToString();
+    }
+
+    static string BuildChartCard(string id, string chartType, string title)
+    {
+        return $"""
+<div class="chart-card"><div class="chart-head">{WebUtility.HtmlEncode(title)}</div><div id="{id}" class="chart" data-chart="{chartType}"><div class="chart-loading">滚动到此处加载图表…</div></div></div>
+""";
+    }
+
+    static string BuildDownsampleNote(string chartPayloadJson)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(chartPayloadJson);
+            if (!doc.RootElement.TryGetProperty("meta", out var meta))
+            {
+                return "";
+            }
+
+            var parts = new List<string>();
+            foreach (var prop in meta.EnumerateObject())
+            {
+                if (prop.Name.EndsWith("Original", StringComparison.Ordinal) && prop.Value.GetInt32() > ChartDataDownsampler.DefaultMaxPoints)
+                {
+                    var key = prop.Name.Replace("Original", "", StringComparison.Ordinal);
+                    if (meta.TryGetProperty(key + "Shown", out var shown))
+                    {
+                        parts.Add($"{key} {prop.Value.GetInt32()} → {shown.GetInt32()} 点");
+                    }
+                }
+            }
+
+            if (parts.Count == 0)
+            {
+                return "";
+            }
+
+            return $"<p class=\"downsample-note\">图表已降采样以提升加载性能：{string.Join("；", parts)}</p>";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    static bool HasPowerData(ReportDataContext data)
+        => data.PowerInfos?.DevicePowerConsumeInfos.Count > 0;
+
+    static bool HasPssData(ReportDataContext data)
+        => data.MemoryUseDatas?.MemoryUsedList.Count > 0;
+
+    static string BuildChartPayload(ReportDataContext data)
+    {
+        var fps = data.FrameRates?.FrameRateList ?? new List<UProfilerFrameInfoDto>();
+        var monitor = data.UProfilerInfos?.UProfilerInfoList ?? new List<UProfilerInfoDto>();
+        var render = data.RenderInfos?.RenderInfoList ?? new List<RenderInfoDto>();
+        var pss = data.MemoryUseDatas?.MemoryUsedList ?? new List<MemoryUseDataDto>();
+        var power = data.PowerInfos?.DevicePowerConsumeInfos ?? new List<DevicePowerConsumeInfoDto>();
+
+        var fpsX = fps.Select(item => item.FrameIndex).ToArray();
+        var fpsY = fps.Select(item => item.Frame).ToArray();
+        DownsamplePair(ref fpsX, ref fpsY, out var fpsOriginal, out var fpsShown);
+
+        var memX = monitor.Select(item => item.FrameIndex).ToArray();
+        var mono = monitor.Select(item => Math.Round(item.MonoUsedSize / 1024.0 / 1024.0, 2)).ToArray();
+        var total = monitor.Select(item => Math.Round(item.TotalAllocatedMemory / 1024.0 / 1024.0, 2)).ToArray();
+        var reserved = monitor.Select(item => Math.Round(item.UnityTotalReservedMemory / 1024.0 / 1024.0, 2)).ToArray();
+        DownsamplePair(ref memX, ref mono, ref total, ref reserved, out var memOriginal, out var memShown);
+
+        var renderX = render.Select(item => item.FrameIndex).ToArray();
+        var setPass = render.Select(item => item.SetPassCall).ToArray();
+        var drawCall = render.Select(item => item.DrawCall).ToArray();
+        var vertices = render.Select(item => item.Vertices).ToArray();
+        var triangles = render.Select(item => item.Triangles).ToArray();
+        DownsampleRender(ref renderX, ref setPass, ref drawCall, ref vertices, ref triangles, out var renderOriginal, out var renderShown);
+
+        var pssX = pss.Select(item => item.FrameIndex).ToArray();
+        var pssY = pss.Select(item => Math.Round(item.PssMemorySize, 2)).ToArray();
+        DownsamplePair(ref pssX, ref pssY, out var pssOriginal, out var pssShown);
+
+        var powerX = power.Select(item => item.FrameIndex).ToArray();
+        var batteryPower = power.Select(item => Math.Round(item.BatteryPower, 2)).ToArray();
+        var cpuTemp = power.Select(item => item.CpuTemperate).ToArray();
+        DownsamplePower(ref powerX, ref batteryPower, ref cpuTemp, out var powerOriginal, out var powerShown);
+
+        var payload = new
+        {
+            meta = new
+            {
+                fpsOriginal,
+                fpsShown,
+                memOriginal,
+                memShown,
+                renderOriginal,
+                renderShown
+            },
+            fps = new { x = fpsX, y = fpsY },
+            memory = new { x = memX, monoUsed = mono, totalAllocated = total, unityReserved = reserved },
+            render = new { x = renderX, setPass, drawCall, vertices, triangles },
+            pss = new { x = pssX, y = pssY },
+            power = new { x = powerX, batteryPower, cpuTemp }
+        };
+
+        return JsonSerializer.Serialize(payload, JsonCamelCase);
+    }
+
+    static void DownsamplePair(ref int[] x, ref int[] y, out int original, out int shown)
+    {
+        original = x.Length;
+        if (x.Length <= ChartDataDownsampler.DefaultMaxPoints)
+        {
+            shown = original;
+            return;
+        }
+
+        var indices = ChartDataDownsampler.PickIndices(x.Length);
+        x = ChartDataDownsampler.DownsampleByIndices(x, indices);
+        y = ChartDataDownsampler.DownsampleByIndices(y, indices);
+        shown = x.Length;
+    }
+
+    static void DownsamplePair(ref int[] x, ref double[] a, ref double[] b, ref double[] c, out int original, out int shown)
+    {
+        original = x.Length;
+        if (x.Length <= ChartDataDownsampler.DefaultMaxPoints)
+        {
+            shown = original;
+            return;
+        }
+
+        var indices = ChartDataDownsampler.PickIndices(x.Length);
+        x = ChartDataDownsampler.DownsampleByIndices(x, indices);
+        a = ChartDataDownsampler.DownsampleByIndices(a, indices);
+        b = ChartDataDownsampler.DownsampleByIndices(b, indices);
+        c = ChartDataDownsampler.DownsampleByIndices(c, indices);
+        shown = x.Length;
+    }
+
+    static void DownsamplePair(ref int[] x, ref double[] y, out int original, out int shown)
+    {
+        original = x.Length;
+        if (x.Length <= ChartDataDownsampler.DefaultMaxPoints)
+        {
+            shown = original;
+            return;
+        }
+
+        var indices = ChartDataDownsampler.PickIndices(x.Length);
+        x = ChartDataDownsampler.DownsampleByIndices(x, indices);
+        y = ChartDataDownsampler.DownsampleByIndices(y, indices);
+        shown = x.Length;
+    }
+
+    static void DownsampleRender(ref int[] x, ref long[] a, ref long[] b, ref long[] c, ref long[] d, out int original, out int shown)
+    {
+        original = x.Length;
+        if (x.Length <= ChartDataDownsampler.DefaultMaxPoints)
+        {
+            shown = original;
+            return;
+        }
+
+        var indices = ChartDataDownsampler.PickIndices(x.Length);
+        x = ChartDataDownsampler.DownsampleByIndices(x, indices);
+        a = ChartDataDownsampler.DownsampleByIndices(a, indices);
+        b = ChartDataDownsampler.DownsampleByIndices(b, indices);
+        c = ChartDataDownsampler.DownsampleByIndices(c, indices);
+        d = ChartDataDownsampler.DownsampleByIndices(d, indices);
+        shown = x.Length;
+    }
+
+    static void DownsamplePower(ref int[] x, ref double[] a, ref int[] b, out int original, out int shown)
+    {
+        original = x.Length;
+        if (x.Length <= ChartDataDownsampler.DefaultMaxPoints)
+        {
+            shown = original;
+            return;
+        }
+
+        var indices = ChartDataDownsampler.PickIndices(x.Length);
+        x = ChartDataDownsampler.DownsampleByIndices(x, indices);
+        a = ChartDataDownsampler.DownsampleByIndices(a, indices);
+        b = ChartDataDownsampler.DownsampleByIndices(b, indices);
+        shown = x.Length;
+    }
+
+    static string BuildFuncJson(ReportDataContext data)
+    {
+        var rows = data.FuncAnalysis.Select(item => new
+        {
+            name = WebUtility.HtmlEncode(item.Name),
+            calls = item.Calls,
+            avgTime = item.AverageTime.ToString("F2", CultureInfo.InvariantCulture),
+            useTime = item.UseTime.ToString("F3", CultureInfo.InvariantCulture),
+            avgMem = item.AverageMemory.ToString("F2", CultureInfo.InvariantCulture),
+            severity = item.AverageTime >= 15 ? "HIGH" : item.AverageTime >= 8 ? "MEDIUM" : "LOW"
+        });
+        return JsonSerializer.Serialize(rows, JsonSafeHtml);
+    }
+
+    static string BuildSidebar()
+    {
+        return """
+<aside class="sidebar">
+  <div class="brand">UProfiler</div>
+  <nav>
+    <a href="#overview">性能总结</a>
+    <a href="#trend">总体性能趋势</a>
+    <a href="#diagnosis">性能诊断</a>
+    <a href="#info">基础与设备信息</a>
+    <a href="#func">函数性能</a>
+    <a href="#log">运行日志</a>
+  </nav>
+</aside>
+""";
+    }
+
+    static string BuildHeader(ReportDataContext data, string productName)
+    {
+        return $"""
+<section id="overview" class="hero">
+  <div>
+    <div class="hero-tag">Unity 性能监控报表</div>
+    <h1>{WebUtility.HtmlEncode(productName)}</h1>
+    <p class="hero-sub">会话 {WebUtility.HtmlEncode(data.SessionKey)} · 包名 {WebUtility.HtmlEncode(data.TestInfo?.PackageName ?? data.PackageName ?? "-")}</p>
+  </div>
+  <div class="hero-meta">
+    <div><span>平台</span><b>{WebUtility.HtmlEncode(data.TestInfo?.Platform ?? "-")}</b></div>
+    <div><span>版本</span><b>{WebUtility.HtmlEncode(data.TestInfo?.Version ?? "-")}</b></div>
+    <div><span>测试时长</span><b>{WebUtility.HtmlEncode(data.TestInfo?.TestTime ?? "-")}</b></div>
+    <div><span>采样间隔</span><b>{data.TestInfo?.IntervalFrame.ToString(CultureInfo.InvariantCulture) ?? "-"} 帧</b></div>
+  </div>
+</section>
+""";
+    }
+
+    static string BuildSummaryCards(ReportDataContext data)
+    {
+        return $"""
+<div class="cards">
+  <div class="card kpi"><div class="label">平均 FPS</div><div class="value">{data.AvgFps:F1}</div><div class="hint">最低 {data.MinFps} / 最高 {data.MaxFps}</div></div>
+  <div class="card kpi"><div class="label">Mono 峰值</div><div class="value">{FormatBytesShort(data.PeakMonoUsed)}</div><div class="hint">Total {FormatBytesShort(data.PeakTotalAllocated)}</div></div>
+  <div class="card kpi"><div class="label">DrawCall 峰值</div><div class="value">{data.PeakDrawCall}</div><div class="hint">三角面 {data.PeakTriangles}</div></div>
+  <div class="card kpi"><div class="label">诊断项</div><div class="value">{data.DiagnosisItems.Count}</div><div class="hint">HIGH {data.DiagnosisItems.Count(item => item.Severity == "HIGH")} / MED {data.DiagnosisItems.Count(item => item.Severity == "MEDIUM")}</div></div>
+</div>
+""";
+    }
+
+    static string BuildInfoSection(ReportDataContext data)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<section id=\"info\" class=\"section\"><div class=\"section-title\">基础与设备信息</div><div class=\"info-grid\">");
+        sb.Append("<div class=\"info-card\"><h3>测试信息</h3><table>");
+        AppendInfoRow(sb, "产品名", data.TestInfo?.ProductName);
+        AppendInfoRow(sb, "包名", data.TestInfo?.PackageName);
+        AppendInfoRow(sb, "平台", data.TestInfo?.Platform);
+        AppendInfoRow(sb, "版本号", data.TestInfo?.Version);
+        AppendInfoRow(sb, "测试时长", data.TestInfo?.TestTime);
+        sb.Append("</table></div>");
+
+        sb.Append("<div class=\"info-card\"><h3>设备信息</h3><table>");
+        AppendInfoRow(sb, "Unity 版本", data.DeviceInfo?.UnityVersion);
+        AppendInfoRow(sb, "操作系统", data.DeviceInfo?.OperatingSystem);
+        AppendInfoRow(sb, "设备型号", data.DeviceInfo?.DeviceModel);
+        AppendInfoRow(sb, "处理器", data.DeviceInfo?.ProcessorType);
+        AppendInfoRow(sb, "显卡", data.DeviceInfo?.GraphicsDeviceName);
+        AppendInfoRow(sb, "分辨率", data.DeviceInfo == null ? null : $"{data.DeviceInfo.ScreenWidth} x {data.DeviceInfo.ScreenHeight}");
+        AppendInfoRow(sb, "系统内存", data.DeviceInfo?.SystemMemorySize.ToString(CultureInfo.InvariantCulture) + " MB");
+        sb.Append("</table></div></div></section>");
+        return sb.ToString();
+    }
+
+    static string BuildFuncSection(ReportDataContext data, string funcJson)
+    {
+        if (data.FuncAnalysis.Count == 0)
+        {
+            return "<section id=\"func\" class=\"section\"><div class=\"section-title\">函数性能分析</div><p class=\"muted\">暂无函数性能数据。请在 Unity 菜单执行 Hook 注入并启用函数分析。</p></section>";
+        }
+
+        return $"""
+<section id="func" class="section">
+<div class="section-title">函数性能分析</div>
+<div class="table-toolbar"><span class="muted">按平均耗时降序 · 分页加载减少 DOM 占用</span>
+<div class="pager"><button id="funcPrev" type="button">上一页</button><span id="funcPageInfo"></span><button id="funcNext" type="button">下一页</button></div></div>
+<table class="data-table"><thead><tr><th>函数名</th><th>调用次数</th><th>平均耗时(ms)</th><th>总耗时(s)</th><th>平均内存(KB)</th><th>状态</th></tr></thead>
+<tbody id="funcTbody"></tbody></table>
+<script type="application/json" id="funcData">{funcJson}</script>
+</section>
+""";
+    }
+
+    static string BuildLogSection(ReportDataContext data, string logJson)
+    {
+        if (data.LogLines.Count == 0)
+        {
+            return "<section id=\"log\" class=\"section\"><div class=\"section-title\">运行日志</div><p class=\"muted\">暂无日志数据。可在 GOT 中启用 Log 监控。</p></section>";
+        }
+
+        return $"""
+<section id="log" class="section">
+<div class="section-title">运行日志</div>
+<div class="table-toolbar"><span class="muted">共 {data.LogLines.Count} 行 · 分批加载</span>
+<button id="logMore" type="button" class="link-btn">加载更多</button></div>
+<div id="logBox" class="log-box"></div>
+<script type="application/json" id="logData">{logJson}</script>
+</section>
+""";
+    }
+
+    static void AppendInfoRow(StringBuilder sb, string label, string? value)
+    {
+        sb.Append("<tr><th>").Append(WebUtility.HtmlEncode(label)).Append("</th><td>");
+        sb.Append(WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(value) ? "-" : value));
+        sb.Append("</td></tr>");
+    }
+
+    static string FormatBytesShort(long bytes)
+    {
+        if (bytes < 1024 * 1024)
+        {
+            return $"{bytes / 1024.0:F0} KB";
+        }
+
+        return $"{bytes / 1024.0 / 1024.0:F1} MB";
+    }
+}

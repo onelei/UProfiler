@@ -1,0 +1,3 @@
+<linker>
+  <assembly fullname="LemonFramework.UProfiler" preserve="all" />
+</linker>
