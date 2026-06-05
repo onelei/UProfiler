@@ -1,46 +1,1 @@
-﻿using System;
-using System.IO;
-
-namespace LemonFramework.UProfiler.Core
-{
-    [Serializable]
-    public struct FuncAnalysisInfo : IBinarySerializable
-    {
-        public string Name;
-        public double Memory;
-        public double AverageMemory;
-        public float UseTime;
-        /// <summary>Average time per call (ms).</summary>
-        public float AverageTime;
-        /// <summary>Call count.</summary>
-        public int Calls;
-
-        public void DeSerialize(BinaryReader reader)
-        {
-            Name = reader.ReadString();
-            Memory = reader.ReadDouble();
-            AverageMemory = reader.ReadDouble();
-            UseTime = reader.ReadSingle();
-            AverageTime = reader.ReadSingle();
-            Calls = reader.ReadInt32();
-        }
-
-        public void Serialize(BinaryWriter writer)
-        {
-            writer.Write(Name);
-            writer.Write(Memory);
-            writer.Write(AverageMemory);
-            writer.Write(UseTime);
-            writer.Write(AverageTime);
-            writer.Write(Calls);
-        }
-
-        public override string ToString()
-        {
-            return string.Format(
-                "Name:{0} Memory:{1}kb AvgMemory:{2}kb UseTime:{3}s AvgTime:{4}ms Calls:{5}",
-                Name, Memory, AverageMemory, UseTime, AverageTime, Calls);
-        }
-    }
-}
-
+﻿using System;using System.IO;namespace LemonFramework.UProfiler.Core{    [Serializable]    public struct FuncAnalysisInfo : IBinarySerializable    {        public string name;        public double memory;        public double averageMemory;        public float useTime;        //Average time per call (ms)        public float averageTime;        //Call count        public int calls;        public void DeSerialize(BinaryReader reader)        {            name = reader.ReadString();            memory = reader.ReadDouble();            averageMemory = reader.ReadDouble();            useTime = reader.ReadSingle();            averageTime = reader.ReadSingle();            calls = reader.ReadInt32();        }        public void Serialize(BinaryWriter writer)        {            writer.Write(name);            writer.Write(memory);            writer.Write(averageMemory);            writer.Write(useTime);            writer.Write(averageTime);            writer.Write(calls);        }        public override string ToString()        {            return                $"Name:{name} Memory:{memory}kb AvgMemory:{averageMemory}kb UseTime:{useTime}s AvgTime:{averageTime}ms Calls:{calls}";        }    }}

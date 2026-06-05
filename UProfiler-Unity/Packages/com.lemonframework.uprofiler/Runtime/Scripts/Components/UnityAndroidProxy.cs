@@ -4,19 +4,19 @@ using UnityEngine;
 
 namespace LemonFramework.UProfiler.Components
 {
-public class UnityAndroidProxy
-{
-    private AndroidJavaClass jc;
-    private AndroidJavaObject jo;
-    private bool isInit = false;
-
-    public UnityAndroidProxy()
+    public class UnityAndroidProxy
     {
-        Init();
-    }
+        private AndroidJavaClass jc;
+        private AndroidJavaObject jo;
+        private bool isInit = false;
 
-    public void Init()
-    {
+        public UnityAndroidProxy()
+        {
+            Init();
+        }
+
+        public void Init()
+        {
 #if UNITY_ANDROID
         if (isInit)
         {
@@ -34,7 +34,7 @@ public class UnityAndroidProxy
             Debug.LogError(e);
         }
 #endif
-    }
+        }
 
 #if UNITY_ANDROID
     public DevicePowerConsumeInfo GetPowerConsumeInfo(int frameIndex = 0)
@@ -48,7 +48,7 @@ public class UnityAndroidProxy
         {
             return default;
         }
-        //Debug.Log($"从安卓获取结�?{result}");
+        //Debug.Log($"从安卓获取结�?{result}");
         string[] args = result.Split('|');
         DevicePowerConsumeInfo devicePowerConsumeInfo = new DevicePowerConsumeInfo();
         devicePowerConsumeInfo.FrameIndex = frameIndex;
@@ -79,5 +79,5 @@ public class UnityAndroidProxy
         return memoryUseData;
     }
 #endif
-}
+    }
 }

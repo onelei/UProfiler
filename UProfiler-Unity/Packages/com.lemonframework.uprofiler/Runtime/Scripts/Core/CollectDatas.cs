@@ -5,7 +5,7 @@ using UnityEngine.Profiling;
 
 namespace LemonFramework.UProfiler.Core
 {
-    public class CollectResFrameDatas<T> where T : UnityEngine.Object
+    public static class CollectResFrameDatas<T> where T : UnityEngine.Object
     {
         public static KeyValuePair<long, int> TakeSample()
         {
@@ -19,37 +19,38 @@ namespace LemonFramework.UProfiler.Core
                 count++;
                 size += sampleSize;
             }
+
             return new KeyValuePair<long, int>(size, count);
         }
     }
 
     public class CollectDatas<T> where T : UnityEngine.Object
     {
-        private readonly List<RecoreInfo> m_Records = new List<RecoreInfo>();
-        private readonly Comparison<RecoreInfo> m_RecordComparer = RecordComparer;
-        private DateTime m_SampleTime = DateTime.MinValue;
-        private int m_SampleCount = 0;
-        private long m_SampleSize = 0L;
+        private readonly List<RecordInfo> _records = new List<RecordInfo>();
+        private readonly Comparison<RecordInfo> _recordComparer = RecordComparer;
+        private DateTime _sampleTime = DateTime.MinValue;
+        private int _sampleCount = 0;
+        private long _sampleSize = 0L;
 
         public void TakeSample()
         {
-            m_Records.Clear();
-            m_SampleTime = DateTime.UtcNow;
-            m_SampleCount = 0;
-            m_SampleSize = 0L;
+            _records.Clear();
+            _sampleTime = DateTime.UtcNow;
+            _sampleCount = 0;
+            _sampleSize = 0L;
             //获取所有类型的资源
             T[] samples = Resources.FindObjectsOfTypeAll<T>();
             for (int i = 0; i < samples.Length; i++)
             {
                 long sampleSize = Profiler.GetRuntimeMemorySizeLong(samples[i]);
                 string name = samples[i].GetType().Name;
-                m_SampleCount++;
-                m_SampleSize += sampleSize;
+                _sampleCount++;
+                _sampleSize += sampleSize;
 
-                RecoreInfo record = null;
-                foreach (RecoreInfo r in m_Records)
+                RecordInfo record = null;
+                foreach (RecordInfo r in _records)
                 {
-                    if (r.Name == name)
+                    if (r.name == name)
                     {
                         record = r;
                         break;
@@ -58,32 +59,32 @@ namespace LemonFramework.UProfiler.Core
 
                 if (record == null)
                 {
-                    record = new RecoreInfo(name);
-                    m_Records.Add(record);
+                    record = new RecordInfo(name);
+                    _records.Add(record);
                 }
 
-                record.Count++;
-                record.Size += sampleSize;
+                record.count++;
+                record.size += sampleSize;
             }
 
-            m_Records.Sort(m_RecordComparer);
+            _records.Sort(_recordComparer);
         }
 
-        private static int RecordComparer(RecoreInfo a, RecoreInfo b)
+        private static int RecordComparer(RecordInfo a, RecordInfo b)
         {
-            int result = b.Size.CompareTo(a.Size);
+            int result = b.size.CompareTo(a.size);
             if (result != 0)
             {
                 return result;
             }
 
-            result = a.Count.CompareTo(b.Count);
+            result = a.count.CompareTo(b.count);
             if (result != 0)
             {
                 return result;
             }
 
-            return a.Name.CompareTo(b.Name);
+            return String.Compare(a.name, b.name, StringComparison.Ordinal);
         }
     }
 }

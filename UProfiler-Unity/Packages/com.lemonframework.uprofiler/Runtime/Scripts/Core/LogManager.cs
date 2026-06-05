@@ -1,40 +1,41 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using UnityEngine;
 
 namespace LemonFramework.UProfiler.Core
 {
-    public class LogManager
+    public static class LogManager
     {
-        static FileStream logFileStream;
-        static string logFilePath = null;
-        static float lastInfoLogWriteTime;
+        static FileStream _logFileStream;
+        static string _logFilePath = null;
 
         public static void CreateLogFile(string path, FileMode fileMode = FileMode.Append)
         {
             if (string.IsNullOrEmpty(path))
             {
                 Debug.LogError("Invalid log file path.");
+                return;
             }
-            else if (File.Exists(path))
+
+            if (File.Exists(path))
             {
                 File.Delete(path);
             }
-            logFileStream = new FileStream(path, fileMode);
-            logFilePath = path;
+
+            _logFileStream = new FileStream(path, fileMode);
+            _logFilePath = path;
         }
 
         public static void CloseLogFile()
         {
-            if (logFileStream != null)
-            {
-                logFilePath = null;
-                logFileStream.Flush();
-                logFileStream.Close();
-                logFileStream.Dispose();
-                logFileStream = null;
-            }
+            if (_logFileStream == null) return;
+            _logFilePath = null;
+            _logFileStream.Flush();
+            _logFileStream.Close();
+            _logFileStream.Dispose();
+            _logFileStream = null;
         }
 
         public static void Log(string msg)
@@ -42,7 +43,7 @@ namespace LemonFramework.UProfiler.Core
             if (ShareDatas.ShowDebugLog)
                 Debug.Log(msg);
             if (ShareDatas.WriteLogToFile)
-                LogToFile(LogType.Log, $"<font color=\"#0000FF\">[Log]</font>{msg}", true);
+                LogToFile(LogType.Log, $"<font color=\"#0000FF\">[Log]</font>{msg}");
         }
 
         public static void LogError(string msg)
@@ -50,7 +51,7 @@ namespace LemonFramework.UProfiler.Core
             if (ShareDatas.ShowDebugLog)
                 Debug.LogError(msg);
             if (ShareDatas.WriteLogToFile)
-                LogToFile(LogType.Error, $"<font color=\"#FF0000\">[Error]</font>{msg}", true);
+                LogToFile(LogType.Error, $"<font color=\"#FF0000\">[Error]</font>{msg}");
         }
 
         public static void LogWarning(string msg)
@@ -58,7 +59,7 @@ namespace LemonFramework.UProfiler.Core
             if (ShareDatas.ShowDebugLog)
                 Debug.LogWarning(msg);
             if (ShareDatas.WriteLogToFile)
-                LogToFile(LogType.Warning, $"<font color=\"#FFD700\">[Warning]</font>{msg}", true);
+                LogToFile(LogType.Warning, $"<font color=\"#FFD700\">[Warning]</font>{msg}");
         }
 
         public static void LogAssert(string msg)
@@ -66,7 +67,7 @@ namespace LemonFramework.UProfiler.Core
             if (ShareDatas.ShowDebugLog)
                 Debug.LogAssertion(msg);
             if (ShareDatas.WriteLogToFile)
-                LogToFile(LogType.Assert, $"<font color=\"#FF0000\">[Assert]{msg}</font>", true);
+                LogToFile(LogType.Assert, $"<font color=\"#FF0000\">[Assert]{msg}</font>");
         }
 
         public static void LogException(Exception ex)
@@ -74,17 +75,17 @@ namespace LemonFramework.UProfiler.Core
             if (ShareDatas.ShowDebugLog)
                 Debug.LogException(ex);
             if (ShareDatas.WriteLogToFile)
-                LogToFile(LogType.Exception, $"<font color=\"#FF0000\">[Exception]</font>{ex.ToString()}", true);
+                LogToFile(LogType.Exception, $"<font color=\"#FF0000\">[Exception]</font>{ex.ToString()}");
         }
 
         public static void LogToFile(string logString, string stackTrace, LogType type)
         {
-            LogToFile(type, logString, true, stackTrace);
+            LogToFile(type, logString, stackTrace);
         }
 
         static string ColorTypeLog(LogType type, string msg)
         {
-            string log = "";
+            var log = string.Empty;
             switch (type)
             {
                 case LogType.Log:
@@ -103,42 +104,39 @@ namespace LemonFramework.UProfiler.Core
                     log = $"<font color=\"#FF0000\">[Assert]{msg.TrimEnd()}</font>";
                     break;
             }
+
             return log;
         }
 
         /// <summary>Append a log line to the log file.</summary>
-        /// <param name="filePath"></param>
-        /// <param name="msg"></param>
-        /// <param name="isForceWrite"></param>
-        public static void LogToFile(LogType logType, string msg, bool isForece = false, string stackTrace = null)
+        private static void LogToFile(LogType logType, string msg, string stackTrace = null)
         {
-            bool isForceWrite = true;
             try
             {
                 if (!msg.EndsWith("\n"))
                 {
                     msg += "\n";
                 }
-                var logStr = $"[{DateTime.Now.ToString()}]{ColorTypeLog(logType, msg)} \n\rstackTrace:{stackTrace}";
+
+                var nowTime = DateTime.Now.ToString(CultureInfo.InvariantCulture);
+                var logStr = $"[{nowTime}]{ColorTypeLog(logType, msg)} \n\rstackTrace:{stackTrace}";
                 byte[] data = Encoding.Default.GetBytes(logStr);
 
-                if (logFileStream == null)
+                if (_logFileStream == null)
                 {
-                    if (string.IsNullOrEmpty(logFilePath))
+                    if (string.IsNullOrEmpty(_logFilePath))
                     {
                         if (string.IsNullOrEmpty(ShareDatas.StartTimeStr))
-                            ShareDatas.StartTimeStr = DateTime.Now.ToString().Replace(" ", "_").Replace("/", "_").Replace(":", "_");
-                        logFilePath = Application.persistentDataPath + "/" + $"log_{ShareDatas.StartTime}.txt";
+                            ShareDatas.StartTimeStr = nowTime.Replace(" ", "_").Replace("/", "_")
+                                .Replace(":", "_");
+                        _logFilePath = Application.persistentDataPath + "/" + $"log_{ShareDatas.StartTime}.txt";
                     }
-                    logFileStream = new FileStream(logFilePath, FileMode.Append);
+
+                    _logFileStream = new FileStream(_logFilePath, FileMode.Append);
                 }
 
-                logFileStream.Write(data, 0, data.Length);
-                if (isForceWrite || Time.time - lastInfoLogWriteTime > 1)
-                {
-                    logFileStream.Flush();
-                    lastInfoLogWriteTime = Time.time;
-                }
+                _logFileStream.Write(data, 0, data.Length);
+                _logFileStream.Flush();
             }
             catch (Exception ex)
             {

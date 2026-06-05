@@ -20,6 +20,7 @@ namespace LemonFramework.UProfiler.Core
     public class ProfilerSampleWithDefineNameAttribute : Attribute
     {
         public string Param1 { get; set; }
+
         public ProfilerSampleWithDefineNameAttribute(string beginFuncName)
         {
             this.Param1 = beginFuncName;

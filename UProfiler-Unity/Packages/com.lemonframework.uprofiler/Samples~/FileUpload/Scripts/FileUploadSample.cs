@@ -65,9 +65,11 @@ public class FileUploadSample : MonoBehaviour
     {
         using (UnityWebRequest webRequest = UnityWebRequest.Post(URL, wWWForm))
         {
-            webRequest.SetRequestHeader("X-HW-ID", "com.huawei.xr.cyberverse.cybersim");
-            webRequest.SetRequestHeader("X-HW-APPKEY", "bA2J8D1u9djyOVtS8efNTQ==");
-            webRequest.SetRequestHeader("Content-Encoding", "gzip");
+            foreach (var header in Config.PostFileHeaders)
+            {
+                webRequest.SetRequestHeader(header.Key, header.Value);
+            }
+
             yield return webRequest.SendWebRequest();
 
             if (webRequest.result == UnityWebRequest.Result.Success)

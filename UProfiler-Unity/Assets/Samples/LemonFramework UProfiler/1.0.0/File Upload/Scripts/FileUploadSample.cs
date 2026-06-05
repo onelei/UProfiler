@@ -4,19 +4,6 @@ using System.Collections;
 using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.UI;
-
-//public class FileUpload : MonoBehaviour
-//{
-//    private void Start()
-//    {
-//        var uploadManager = gameObject.AddComponent<FileUploadManager>();
-//        uploadManager.UploadFiles(Config.PostFileHeaders, new System.Collections.Generic.Dictionary<string, string>() { { "testcase_name", "testaladdin1" } }, "folder", new System.Collections.Generic.List<string>() { { "D:/captureFrame_2022_5_1_23_10_50.zip" } }, (res, errorInfo) =>
-//        {
-//            Debug.Log($"������:{res}  error:{errorInfo}");
-//        });
-//    }
-//}
 
 namespace LemonFramework.UProfiler.Samples
 {
@@ -65,9 +52,11 @@ public class FileUploadSample : MonoBehaviour
     {
         using (UnityWebRequest webRequest = UnityWebRequest.Post(URL, wWWForm))
         {
-            webRequest.SetRequestHeader("X-HW-ID", "com.huawei.xr.cyberverse.cybersim");
-            webRequest.SetRequestHeader("X-HW-APPKEY", "bA2J8D1u9djyOVtS8efNTQ==");
-            webRequest.SetRequestHeader("Content-Encoding", "gzip");
+            foreach (var header in Config.PostFileHeaders)
+            {
+                webRequest.SetRequestHeader(header.Key, header.Value);
+            }
+
             yield return webRequest.SendWebRequest();
 
             if (webRequest.result == UnityWebRequest.Result.Success)

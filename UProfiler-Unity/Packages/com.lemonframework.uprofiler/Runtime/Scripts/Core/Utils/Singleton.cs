@@ -1,54 +1,25 @@
 using System;
 using UnityEngine;
+
 namespace LemonFramework.UProfiler.Core
 {
     public abstract class Singleton<T> where T : class, new()
     {
-        public class Options
+        public abstract class Options
         {
-
         }
 
-        protected static T p_instance;
+        private static T _instance;
 
         public static T GetInstance()
         {
-            if (p_instance != null)
+            if (_instance != null)
             {
-                return p_instance;
-            }
-            p_instance = Activator.CreateInstance<T>();
-            return p_instance;
-        }
-        public virtual void Initialize(Options options = null) { }
-        public virtual void Dispose()
-        {
-            if (p_instance != null)
-            {
-                p_instance = null;
-            }
-        }
-    }
-
-    public abstract class MonoSingleton<T> : MonoBehaviour where T : Component
-    {
-        public class Options
-        {
-
-        }
-
-        protected static T p_instance;
-
-        public static T GetInstance(string objName, GameObject obj = null)
-        {
-            if (p_instance != null) return p_instance;
-            if (obj == null)
-            {
-                obj = new GameObject("[" + objName + "]");
+                return _instance;
             }
 
-            p_instance = (T)obj.AddComponent(typeof(T));
-            return p_instance;
+            _instance = Activator.CreateInstance<T>();
+            return _instance;
         }
 
         public virtual void Initialize(Options options = null)
@@ -57,12 +28,38 @@ namespace LemonFramework.UProfiler.Core
 
         public virtual void Dispose()
         {
-            if (p_instance != null)
+            _instance = null;
+        }
+    }
+
+    public abstract class MonoSingleton<T> : MonoBehaviour where T : Component
+    {
+        public abstract class Options
+        {
+        }
+
+        private static T _instance;
+
+        public static T GetInstance(string objName, GameObject obj = null)
+        {
+            if (_instance != null) return _instance;
+            if (obj == null)
             {
-                p_instance = null;
+                obj = new GameObject("[" + objName + "]");
             }
 
-            UnityEngine.Object.Destroy(gameObject);
+            _instance = (T) obj.AddComponent(typeof(T));
+            return _instance;
+        }
+
+        public virtual void Initialize(Options options = null)
+        {
+        }
+
+        public virtual void Dispose()
+        {
+            _instance = null;
+            Destroy(gameObject);
         }
     }
 }

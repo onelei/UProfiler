@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace LemonFramework.UProfiler.Core
 {
@@ -13,45 +10,47 @@ namespace LemonFramework.UProfiler.Core
     [Serializable]
     public struct MemoryUseData : IBinarySerializable
     {
-        public int FrameIndex;
-        public float PssMemorySize;//M
+        public int frameIndex;
+        public float pssMemorySize; //M
 
         public void DeSerialize(BinaryReader reader)
         {
-            FrameIndex = reader.ReadInt32();
-            PssMemorySize = reader.ReadSingle();
+            frameIndex = reader.ReadInt32();
+            pssMemorySize = reader.ReadSingle();
         }
 
         public void Serialize(BinaryWriter writer)
         {
-            writer.Write(FrameIndex);
-            writer.Write(PssMemorySize);
+            writer.Write(frameIndex);
+            writer.Write(pssMemorySize);
         }
     }
 
     /// <summary>
     /// PSS内存使用
     /// </summary>
+    [Serializable]
     public class MemoryUseDatas : IBinarySerializable
     {
-        public List<MemoryUseData> MemoryUsedList= new List<MemoryUseData>();
+        public List<MemoryUseData> memoryUsedList = new List<MemoryUseData>();
 
         public void DeSerialize(BinaryReader reader)
         {
             int count = reader.ReadInt32();
             for (int i = 0; i < count; i++)
             {
-                MemoryUseData tempData = new MemoryUseData();
+                var tempData = new MemoryUseData();
                 tempData.DeSerialize(reader);
-                MemoryUsedList.Add(tempData);
+                memoryUsedList.Add(tempData);
             }
         }
+
         public void Serialize(BinaryWriter writer)
         {
-            writer.Write(MemoryUsedList.Count);
-            for (int i = 0; i < MemoryUsedList.Count; i++)
+            writer.Write(memoryUsedList.Count);
+            for (int i = 0; i < memoryUsedList.Count; i++)
             {
-                MemoryUsedList[i].Serialize(writer);
+                memoryUsedList[i].Serialize(writer);
             }
         }
     }

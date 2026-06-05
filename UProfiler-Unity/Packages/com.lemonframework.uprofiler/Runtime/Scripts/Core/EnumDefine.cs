@@ -10,13 +10,4 @@ namespace LemonFramework.UProfiler.Core
         /// <summary>Methods marked with [ProfilerSample].</summary>
         PROFILESAMPLE
     }
-
-    /// <summary>Hook wrapper type for Begin/End injection.</summary>
-    public enum EBeginEndType
-    {
-        /// <summary>Debug.Log at entry/exit.</summary>
-        LOG = 1,
-        /// <summary>Performance timing.</summary>
-        ANALYZE
-    }
 }

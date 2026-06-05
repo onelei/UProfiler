@@ -8,7 +8,8 @@ namespace LemonFramework.UProfiler.Core
     [Serializable]
     public class LogInfos : IBinarySerializable
     {
-        public List<string> LogDatas = new List<string>();
+        public List<string> logList = new List<string>();
+        private StringBuilder _stringBuilder = new StringBuilder();
 
         public void DeSerialize(BinaryReader reader)
         {
@@ -16,27 +17,28 @@ namespace LemonFramework.UProfiler.Core
             for (int i = 0; i < count; i++)
             {
                 string str = reader.ReadString();
-                LogDatas.Add(str);
+                logList.Add(str);
             }
         }
 
         public void Serialize(BinaryWriter writer)
         {
-            writer.Write(LogDatas.Count);
-            for (int i = 0; i < LogDatas.Count; i++)
+            writer.Write(logList.Count);
+            for (int i = 0; i < logList.Count; i++)
             {
-                writer.Write(LogDatas[i]);
+                writer.Write(logList[i]);
             }
         }
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < LogDatas.Count; i++)
+            _stringBuilder.Clear();
+            for (int i = 0; i < logList.Count; i++)
             {
-                sb.AppendLine(LogDatas[i]);
+                _stringBuilder.AppendLine(logList[i]);
             }
-            return sb.ToString();
+
+            return _stringBuilder.ToString();
         }
     }
 }

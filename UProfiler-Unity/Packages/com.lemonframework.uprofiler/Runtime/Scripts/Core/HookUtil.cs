@@ -79,8 +79,8 @@ namespace LemonFramework.UProfiler.Core
             }
             else
             {
-                fileCSVName = ConstString.FuncAnalysisPrefix + testTime;
-                fileTxtName = ConstString.FuncAnalysisPrefix + testTime + ConstString.TextExt;
+                fileCSVName = ConstString.funcAnalysisPrefix + testTime;
+                fileTxtName = ConstString.funcAnalysisPrefix + testTime + ConstString.textExt;
                 fileTxtName = Path.Combine(Application.persistentDataPath, fileTxtName);
             }
             fileCSVName += ".csv";
@@ -118,12 +118,12 @@ namespace LemonFramework.UProfiler.Core
                     if (tmp.FuncCalls <= 0) continue;
                     FuncAnalysisInfo funcInfo = new FuncAnalysisInfo()
                     {
-                        Name = tmp.FuncName,
-                        Memory = tmp.FuncMemory / 1024.0,
-                        AverageMemory = tmp.FuncTotalMemory / (tmp.FuncCalls * 1024.0),
-                        UseTime = tmp.FuncTime,
-                        AverageTime = tmp.FuncTotalTime / tmp.FuncCalls * 1000,
-                        Calls = tmp.FuncCalls
+                        name = tmp.FuncName,
+                        memory = tmp.FuncMemory / 1024.0,
+                        averageMemory = tmp.FuncTotalMemory / (tmp.FuncCalls * 1024.0),
+                        useTime = tmp.FuncTime,
+                        averageTime = tmp.FuncTotalTime / tmp.FuncCalls * 1000,
+                        calls = tmp.FuncCalls
                     };
                     funcAnalysisInfos.Add(funcInfo);
                 }

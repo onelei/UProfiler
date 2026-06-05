@@ -1,56 +1,1 @@
-﻿using System;
-using System.IO;
-
-namespace LemonFramework.UProfiler.Core
-{
-    /// <summary>Test session metadata.</summary>
-    [Serializable]
-    public struct TestInfo : IBinarySerializable
-    {
-        public string ProductName;
-        public string PackageName;
-        public string Platform;
-        public string Version;
-        public string TestTime;
-        /// <summary>Sample interval (frames).</summary>
-        public int IntervalFrame;
-
-        public override string ToString()
-        {
-            return string.Format(
-                "ProductName:{0}\n" +
-                "PackageName:{1}\n" +
-                "Platform:{2}\n" +
-                "Version:{3}\n" +
-                "TestTime:{4}\n" +
-                "IntervalFrame:{5}",
-                ProductName,
-                PackageName,
-                Platform,
-                Version,
-                TestTime,
-                IntervalFrame);
-        }
-
-        public void DeSerialize(BinaryReader reader)
-        {
-            ProductName = reader.ReadString();
-            PackageName = reader.ReadString();
-            Platform = reader.ReadString();
-            Version = reader.ReadString();
-            TestTime = reader.ReadString();
-            IntervalFrame = reader.ReadInt32();
-        }
-
-        public void Serialize(BinaryWriter writer)
-        {
-            writer.Write(ProductName);
-            writer.Write(PackageName);
-            writer.Write(Platform);
-            writer.Write(Version);
-            writer.Write(TestTime);
-            writer.Write(IntervalFrame);
-        }
-    }
-}
-
+﻿using System;using System.IO;namespace LemonFramework.UProfiler.Core{    //Test session metadata    [Serializable]    public struct TestInfo : IBinarySerializable    {        public string productName;        public string packageName;        public string platform;        public string version;        public string testTime;        //Sample interval (frames)        public int intervalFrame;        public override string ToString()        {            return $"ProductName:{productName}\n" + $"PackageName:{packageName}\n" + $"Platform:{platform}\n" +                   $"Version:{version}\n" + $"TestTime:{testTime}\n" + $"IntervalFrame:{intervalFrame}";        }        public void DeSerialize(BinaryReader reader)        {            productName = reader.ReadString();            packageName = reader.ReadString();            platform = reader.ReadString();            version = reader.ReadString();            testTime = reader.ReadString();            intervalFrame = reader.ReadInt32();        }        public void Serialize(BinaryWriter writer)        {            writer.Write(productName);            writer.Write(packageName);            writer.Write(platform);            writer.Write(version);            writer.Write(testTime);            writer.Write(intervalFrame);        }    }}

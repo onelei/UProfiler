@@ -2,7 +2,7 @@
 
 namespace LemonFramework.UProfiler.Core
 {
-    public class ShareDatas
+    public static class ShareDatas
     {
         public static DateTime StartTime;
         public static DateTime EndTime;

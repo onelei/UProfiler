@@ -3,18 +3,18 @@ using UnityEditor;
 
 namespace LemonFramework.UProfiler.Editor
 {
-[InitializeOnLoad]
-public static class AllowInsecureHttpSetting
-{
-    static AllowInsecureHttpSetting()
+    [InitializeOnLoad]
+    public static class AllowInsecureHttpSetting
     {
-        if (PlayerSettings.insecureHttpOption != InsecureHttpOption.AlwaysAllowed)
+        static AllowInsecureHttpSetting()
         {
-            PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed;
-            AssetDatabase.SaveAssets();
-            UnityEngine.Debug.Log("[UProfiler] PlayerSettings.insecureHttpOption set to AlwaysAllowed.");
+            if (PlayerSettings.insecureHttpOption != InsecureHttpOption.AlwaysAllowed)
+            {
+                PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed;
+                AssetDatabase.SaveAssets();
+                UnityEngine.Debug.Log("[UProfiler] PlayerSettings.insecureHttpOption set to AlwaysAllowed.");
+            }
         }
     }
-}
 }
 #endif

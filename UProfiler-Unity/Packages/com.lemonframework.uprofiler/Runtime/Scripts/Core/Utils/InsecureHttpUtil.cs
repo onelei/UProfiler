@@ -11,10 +11,10 @@ namespace LemonFramework.UProfiler.Core
 {
     public static class InsecureHttpUtil
     {
-        public static bool IsInsecureHttpUrl(string url)
+        private static bool IsInsecureHttpUrl(string url)
         {
             return !string.IsNullOrEmpty(url)
-                && url.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
+                   && url.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
         }
 
         public static IEnumerator Get(string url, Action<bool, string> callback)
@@ -44,6 +44,7 @@ namespace LemonFramework.UProfiler.Core
                     }
 #endif
                 }
+
                 yield break;
             }
 
@@ -55,10 +56,10 @@ namespace LemonFramework.UProfiler.Core
             {
                 try
                 {
-                    var request = (HttpWebRequest)WebRequest.Create(url);
+                    var request = (HttpWebRequest) WebRequest.Create(url);
                     request.Method = "GET";
                     request.Timeout = 10000;
-                    using (var webResponse = (HttpWebResponse)request.GetResponse())
+                    using (var webResponse = (HttpWebResponse) request.GetResponse())
                     using (var reader = new StreamReader(webResponse.GetResponseStream()))
                     {
                         response = reader.ReadToEnd();
@@ -82,7 +83,8 @@ namespace LemonFramework.UProfiler.Core
             callback?.Invoke(error == null, error ?? response);
         }
 
-        public static IEnumerator Post(string url, WWWForm form, Dictionary<string, string> headers, Action<bool, string> callback)
+        public static IEnumerator Post(string url, WWWForm form, Dictionary<string, string> headers,
+            Action<bool, string> callback)
         {
             if (!IsInsecureHttpUrl(url))
             {
@@ -110,6 +112,7 @@ namespace LemonFramework.UProfiler.Core
                     }
 #endif
                 }
+
                 yield break;
             }
 
@@ -123,7 +126,7 @@ namespace LemonFramework.UProfiler.Core
             {
                 try
                 {
-                    var request = (HttpWebRequest)WebRequest.Create(url);
+                    var request = (HttpWebRequest) WebRequest.Create(url);
                     request.Method = "POST";
                     request.Timeout = 30000;
                     request.ContentType = formHeaders["Content-Type"];
@@ -146,7 +149,7 @@ namespace LemonFramework.UProfiler.Core
                         stream.Write(body, 0, body.Length);
                     }
 
-                    using (var webResponse = (HttpWebResponse)request.GetResponse())
+                    using (var webResponse = (HttpWebResponse) request.GetResponse())
                     using (var reader = new StreamReader(webResponse.GetResponseStream()))
                     {
                         response = reader.ReadToEnd();
@@ -161,7 +164,8 @@ namespace LemonFramework.UProfiler.Core
                             response = reader.ReadToEnd();
                         }
 
-                        error = $"The remote server returned an error: ({(int)httpResponse.StatusCode}) {httpResponse.StatusDescription}. {response}";
+                        error =
+                            $"The remote server returned an error: ({(int) httpResponse.StatusCode}) {httpResponse.StatusDescription}. {response}";
                     }
                     else
                     {
