@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using UProfiler.Server.Models;
 using UProfiler.Server.Services;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.ResponseCompression;
@@ -24,6 +25,11 @@ if (TryGenerateReportOnly(args, uploadDir, reportDir, out var generatedReportPat
 }
 
 var port = FindAvailablePort(requestedPort);
+
+var authSettings = AuthSettingsLoader.Load(baseDir, port);
+var userStore = new UserStore(baseDir);
+var authSessionService = new AuthSessionService(authSettings);
+var feishuOAuthService = new FeishuOAuthService(authSettings);
 
 var serverState = new ServerState();
 var uploadIndex = new UploadIndex(uploadDir);
@@ -83,16 +89,20 @@ app.UseStaticFiles(new StaticFileOptions
 app.MapMethods("/{**path}", new[] { "GET", "POST", "PUT", "OPTIONS" }, async (HttpContext context) =>
 {
     var path = context.Request.Path.Value ?? "/";
+    var method = context.Request.Method;
 
     try
     {
+        var currentUser = AuthMiddlewareHelper.ResolveCurrentUser(context, authSessionService, userStore);
+        AuthRequestContext.Set(currentUser, authSettings);
+
         IFormCollection? form = null;
         if (context.Request.HasFormContentType)
         {
             form = await context.Request.ReadFormAsync();
         }
 
-        if (context.Request.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+        if (method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
         {
             return Results.Ok();
         }
@@ -100,6 +110,31 @@ app.MapMethods("/{**path}", new[] { "GET", "POST", "PUT", "OPTIONS" }, async (Ht
         if (TryServeStaticFile(path, staticWebRoot, out var staticFileResult))
         {
             return staticFileResult;
+        }
+
+        if (TryHandleAuthRoutes(
+                context,
+                path,
+                method,
+                form,
+                authSettings,
+                authSessionService,
+                feishuOAuthService,
+                userStore,
+                out var authResult))
+        {
+            return authResult;
+        }
+
+        if (AuthMiddlewareHelper.RequiresUploadAuth(authSettings, path) && currentUser == null)
+        {
+            return Results.Text("unauthorized", "text/plain", Encoding.UTF8, (int)HttpStatusCode.Unauthorized);
+        }
+
+        if (AuthMiddlewareHelper.RequiresViewAuth(authSettings, path, method) && currentUser == null)
+        {
+            var returnUrl = Uri.EscapeDataString(path + context.Request.QueryString);
+            return Results.Redirect($"/login?returnUrl={returnUrl}");
         }
 
         if (path.StartsWith("/capture/", StringComparison.OrdinalIgnoreCase)
@@ -198,10 +233,14 @@ app.MapMethods("/{**path}", new[] { "GET", "POST", "PUT", "OPTIONS" }, async (Ht
         await SafeLogErrorAsync(serverState, path, ex);
         return Results.Text($"error: {ex.Message}", "text/plain", Encoding.UTF8, (int)HttpStatusCode.InternalServerError);
     }
+    finally
+    {
+        AuthRequestContext.Clear();
+    }
 });
 
 var localIp = GetLocalIPv4();
-Console.WriteLine($"UProfiler local server started.");
+Console.WriteLine($"UProfiler local server started. (v{VersionInfo.Current})");
 Console.WriteLine($"  Local:   http://localhost:{port}/");
 if (!string.IsNullOrWhiteSpace(localIp))
 {
@@ -210,6 +249,7 @@ if (!string.IsNullOrWhiteSpace(localIp))
 Console.WriteLine($"Upload dir:  {uploadDir}");
 Console.WriteLine($"Report dir:  {reportDir}");
 Console.WriteLine($"Log dir:     {logDir}");
+PrintAuthStatus(authSettings, port);
 Console.WriteLine("Press Ctrl+C to stop.");
 
 app.Run();
@@ -547,6 +587,236 @@ static string BuildMissingReportPage(string path, string sessionKey)
 </body>
 </html>
 """;
+}
+
+static void PrintAuthStatus(AuthSettings settings, int port)
+{
+    if (!settings.Enabled)
+    {
+        Console.WriteLine("Auth:        disabled (copy auth.example.json to auth.json to enable)");
+        return;
+    }
+
+    Console.WriteLine("Auth:        enabled");
+    Console.WriteLine($"  View auth:   {settings.RequireAuthForView}");
+    Console.WriteLine($"  Upload auth: {settings.RequireAuthForUpload}");
+    if (AuthSettingsLoader.IsFeishuConfigured(settings))
+    {
+        Console.WriteLine($"  Feishu:      configured, callback {settings.Feishu.RedirectUri}");
+    }
+    else
+    {
+        Console.WriteLine("  Feishu:      NOT configured (set appId/appSecret in auth.json)");
+    }
+
+    if (settings.SessionSecret.Contains("change-me", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine("  Warning:     sessionSecret is default, change it before production deploy");
+    }
+}
+
+static bool TryHandleAuthRoutes(
+    HttpContext context,
+    string path,
+    string method,
+    IFormCollection? form,
+    AuthSettings authSettings,
+    AuthSessionService authSessionService,
+    FeishuOAuthService feishuOAuthService,
+    UserStore userStore,
+    out IResult result)
+{
+    result = Results.NotFound();
+
+    if (path.Equals("/login", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+    {
+        var currentUser = AuthRequestContext.Current;
+        if (currentUser != null)
+        {
+            result = Results.Redirect("/");
+            return true;
+        }
+
+        var error = context.Request.Query["error"].ToString();
+        var returnUrl = context.Request.Query["returnUrl"].ToString();
+        result = Results.Content(
+            AccountHtmlBuilder.BuildLoginPage(
+                authSettings,
+                string.IsNullOrWhiteSpace(error) ? null : error,
+                string.IsNullOrWhiteSpace(returnUrl) ? null : returnUrl),
+            "text/html; charset=utf-8",
+            Encoding.UTF8);
+        return true;
+    }
+
+    if (path.Equals("/auth/feishu", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+    {
+        if (!AuthSettingsLoader.IsFeishuConfigured(authSettings))
+        {
+            result = Results.Redirect("/login?error=" + Uri.EscapeDataString("飞书登录未配置"));
+            return true;
+        }
+
+        var state = authSessionService.CreateOAuthState();
+        var cookieOptions = new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+            MaxAge = TimeSpan.FromMinutes(10)
+        };
+        context.Response.Cookies.Append(AuthSessionService.StateCookieName, state, cookieOptions);
+
+        var returnUrl = context.Request.Query["returnUrl"].ToString();
+        if (!string.IsNullOrWhiteSpace(returnUrl) && returnUrl.StartsWith('/'))
+        {
+            context.Response.Cookies.Append("uprofiler_return_url", returnUrl, cookieOptions);
+        }
+
+        result = Results.Redirect(feishuOAuthService.BuildAuthorizeUrl(state));
+        return true;
+    }
+
+    if (path.Equals("/auth/feishu/callback", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+    {
+        var code = context.Request.Query["code"].ToString();
+        var state = context.Request.Query["state"].ToString();
+        context.Request.Cookies.TryGetValue(AuthSessionService.StateCookieName, out var savedState);
+        context.Response.Cookies.Delete(AuthSessionService.StateCookieName);
+        context.Request.Cookies.TryGetValue("uprofiler_return_url", out var savedReturnUrl);
+        context.Response.Cookies.Delete("uprofiler_return_url");
+
+        if (string.IsNullOrWhiteSpace(code)
+            || string.IsNullOrWhiteSpace(state)
+            || string.IsNullOrWhiteSpace(savedState)
+            || !string.Equals(state, savedState, StringComparison.Ordinal))
+        {
+            result = Results.Redirect("/login?error=" + Uri.EscapeDataString("飞书授权失败，请重试"));
+            return true;
+        }
+
+        var feishuUser = feishuOAuthService.ExchangeCodeAsync(code).GetAwaiter().GetResult();
+        if (feishuUser == null || string.IsNullOrWhiteSpace(feishuUser.OpenId))
+        {
+            result = Results.Redirect("/login?error=" + Uri.EscapeDataString("无法获取飞书用户信息"));
+            return true;
+        }
+
+        var user = userStore.UpsertFromFeishu(
+            feishuUser.OpenId,
+            feishuUser.UnionId,
+            feishuUser.Name,
+            feishuUser.AvatarUrl,
+            authSettings.AdminOpenIds);
+
+        context.Response.Cookies.Append(
+            AuthSessionService.CookieName,
+            authSessionService.CreateSessionCookie(user),
+            authSessionService.BuildSessionCookieOptions());
+
+        var returnUrl = savedReturnUrl;
+        if (string.IsNullOrWhiteSpace(returnUrl) || !returnUrl.StartsWith('/'))
+        {
+            returnUrl = "/account/profile";
+        }
+
+        result = Results.Redirect(returnUrl);
+        return true;
+    }
+
+    if (path.Equals("/auth/logout", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("POST", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Cookies.Delete(AuthSessionService.CookieName, authSessionService.BuildClearCookieOptions());
+        result = Results.Redirect("/login");
+        return true;
+    }
+
+    if (path.Equals("/account", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+    {
+        result = Results.Redirect("/account/profile");
+        return true;
+    }
+
+    if (path.Equals("/account/profile", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+    {
+        var user = AuthRequestContext.Current;
+        if (user == null)
+        {
+            result = Results.Redirect("/login?returnUrl=" + Uri.EscapeDataString(path));
+            return true;
+        }
+
+        result = Results.Content(
+            AccountHtmlBuilder.BuildAccountPage(user, AccountHtmlBuilder.AccountSection.Profile),
+            "text/html; charset=utf-8",
+            Encoding.UTF8);
+        return true;
+    }
+
+    if (path.Equals("/account/settings", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
+    {
+        var user = AuthRequestContext.Current;
+        if (user == null)
+        {
+            result = Results.Redirect("/login?returnUrl=" + Uri.EscapeDataString(path));
+            return true;
+        }
+
+        result = Results.Content(
+            AccountHtmlBuilder.BuildAccountPage(user, AccountHtmlBuilder.AccountSection.Account),
+            "text/html; charset=utf-8",
+            Encoding.UTF8);
+        return true;
+    }
+
+    if (path.Equals("/api/account/profile", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("POST", StringComparison.OrdinalIgnoreCase))
+    {
+        var user = AuthRequestContext.Current;
+        if (user == null)
+        {
+            result = Results.Json(new { ok = false, message = "未登录" }, statusCode: (int)HttpStatusCode.Unauthorized);
+            return true;
+        }
+
+        var update = new UserProfileUpdate
+        {
+            Username = form?["username"].ToString(),
+            Company = form?["company"].ToString(),
+            CompanyPhone = form?["companyPhone"].ToString(),
+            Occupation = form?["occupation"].ToString(),
+            Education = form?["education"].ToString(),
+            Major = form?["major"].ToString(),
+            Bio = form?["bio"].ToString(),
+            BirthYear = TryParseNullableInt(form?["birthYear"].ToString()),
+            BirthMonth = TryParseNullableInt(form?["birthMonth"].ToString()),
+            BirthDay = TryParseNullableInt(form?["birthDay"].ToString())
+        };
+
+        if (string.IsNullOrWhiteSpace(update.Username))
+        {
+            result = Results.Json(new { ok = false, message = "用户名不能为空" });
+            return true;
+        }
+
+        var saved = userStore.UpdateProfile(user.Id, update);
+        result = Results.Json(new { ok = saved, message = saved ? "已保存" : "保存失败" });
+        return true;
+    }
+
+    return false;
+}
+
+static int? TryParseNullableInt(string? value)
+{
+    return int.TryParse(value, out var number) && number > 0 ? number : null;
 }
 
 static string BuildNotFoundPage(string path)

@@ -1,3 +1,6 @@
+# Tool / MCP artifacts
+.playwright-mcp/
+
 # OS / IDE
 .DS_Store
 .idea/

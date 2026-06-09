@@ -50,7 +50,8 @@ public static class PortalHtmlBuilder
 
         sb.Append("</div></div>");
         sb.Append(BuildActivitySidebar(catalog.RecentSessions, null));
-        sb.Append("</div></div></body></html>");
+        sb.Append("<script defer src=\"").Append(StaticAssets.Js("account.js")).Append("\"></script>");
+        sb.Append("</div></body></html>");
         return sb.ToString();
     }
 
@@ -118,7 +119,8 @@ public static class PortalHtmlBuilder
 
         sb.Append("</div>");
         sb.Append(BuildActivitySidebar(project.Sessions, null));
-        sb.Append("</div></div></body></html>");
+        sb.Append("<script defer src=\"").Append(StaticAssets.Js("account.js")).Append("\"></script>");
+        sb.Append("</div></body></html>");
         return sb.ToString();
     }
 
@@ -205,6 +207,7 @@ public static class PortalHtmlBuilder
         sb.Append("</tbody></table></div></div></div>");
         sb.Append("<script>window.trendData = ").Append(trendJson).Append(";</script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("portal-trend.js")).Append("\"></script>");
+        sb.Append("<script defer src=\"").Append(StaticAssets.Js("account.js")).Append("\"></script>");
         sb.Append("</div></body></html>");
         return sb.ToString();
     }
@@ -319,6 +322,8 @@ public static class PortalHtmlBuilder
     public static string BuildTopNav(NavTab tab, string? packageName)
     {
         var pkgUrl = packageName == null ? null : ProjectCatalog.EncodePackage(packageName);
+        var user = AuthRequestContext.Current;
+        var auth = AuthRequestContext.Settings;
         var sb = new StringBuilder();
         sb.Append("<header class=\"top-nav\">");
         sb.Append("<div class=\"nav-left\"><a class=\"logo\" href=\"/\">UProfiler</a><span class=\"logo-sub\">MAKE IT SIMPLE</span></div>");
@@ -329,8 +334,47 @@ public static class PortalHtmlBuilder
             sb.Append("<a class=\"nav-link").Append(tab == NavTab.Project ? " active" : "").Append("\" href=\"/project/").Append(pkgUrl).Append("\">项目</a>");
             sb.Append("<a class=\"nav-link").Append(tab == NavTab.Performance ? " active" : "").Append("\" href=\"/project/").Append(pkgUrl).Append("/performance\">总体性能分析</a>");
         }
-        sb.Append("</nav></header>");
+        sb.Append("</nav>");
+        sb.Append(BuildUserMenu(user, auth));
+        sb.Append("</header>");
         return sb.ToString();
+    }
+
+    static string BuildUserMenu(Models.UserProfile? user, Models.AuthSettings? auth)
+    {
+        if (auth == null || !auth.Enabled)
+        {
+            return "";
+        }
+
+        if (user == null)
+        {
+            return """<div class="nav-right"><a class="login-link" href="/login">登录</a></div>""";
+        }
+
+        var displayName = string.IsNullOrWhiteSpace(user.DisplayName) ? user.Username : user.DisplayName;
+        var avatarContent = string.IsNullOrWhiteSpace(user.AvatarUrl)
+            ? WebUtility.HtmlEncode(GetInitials(displayName))
+            : $"""<img src="{WebUtility.HtmlEncode(user.AvatarUrl)}" alt="avatar" />""";
+
+        return $"""
+<div class="nav-right">
+  <div class="user-menu">
+    <button type="button" class="user-trigger" aria-label="账户菜单">
+      <span class="user-avatar">{avatarContent}</span>
+      <span class="user-name">{WebUtility.HtmlEncode(displayName)}</span>
+    </button>
+    <div class="user-dropdown">
+      <a class="dropdown-item" href="/account/profile">账户设置</a>
+      <a class="dropdown-item" href="/account/settings">账户资料</a>
+      <div class="dropdown-divider"></div>
+      <form method="post" action="/auth/logout" style="margin:0">
+        <button type="submit" class="dropdown-item danger" style="width:100%;border:none;background:transparent;text-align:left;cursor:pointer">退出登录</button>
+      </form>
+    </div>
+  </div>
+</div>
+""";
     }
 
     static string FormatSessionDate(string sessionKey)
@@ -353,9 +397,9 @@ public static class PortalHtmlBuilder
         return name.Length >= 2 ? name[..2] : name;
     }
 
-    static string PortalHeadLinks()
-        => $"""<link rel="stylesheet" href="{StaticAssets.Css("portal.css")}" />""";
+    public static string PortalHeadLinks()
+        => $"""<link rel="stylesheet" href="{StaticAssets.Css("portal.css")}" /><link rel="stylesheet" href="{StaticAssets.Css("account.css")}" />""";
 
     public static string GetTopNavStyles()
-        => $"""<link rel="stylesheet" href="{StaticAssets.Css("portal.css")}" />""";
+        => $"""<link rel="stylesheet" href="{StaticAssets.Css("portal.css")}" /><link rel="stylesheet" href="{StaticAssets.Css("account.css")}" /><script defer src="{StaticAssets.Js("account.js")}"></script>""";
 }

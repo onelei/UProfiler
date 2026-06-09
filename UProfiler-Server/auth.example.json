@@ -1,0 +1,13 @@
+{
+  "enabled": false,
+  "requireAuthForView": true,
+  "requireAuthForUpload": false,
+  "sessionDays": 7,
+  "sessionSecret": "please-change-this-to-a-random-secret",
+  "feishu": {
+    "appId": "",
+    "appSecret": "",
+    "redirectUri": "http://localhost:8080/auth/feishu/callback"
+  },
+  "adminOpenIds": []
+}

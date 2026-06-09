@@ -1,6 +1,6 @@
 {
   "name": "com.lemonframework.uprofiler",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "LemonFramework UProfiler",
   "description": "LemonFramework UProfiler: data collection, upload, and profiling helpers for Unity.",
   "unity": "2022.3",

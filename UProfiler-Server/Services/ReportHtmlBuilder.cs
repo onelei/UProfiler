@@ -39,6 +39,7 @@ public static class ReportHtmlBuilder
         sb.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />");
         sb.Append("<title>").Append(WebUtility.HtmlEncode(reportTitle)).Append("</title>");
         sb.Append("<link rel=\"stylesheet\" href=\"").Append(StaticAssets.Css("portal.css")).Append("\" />");
+        sb.Append("<link rel=\"stylesheet\" href=\"").Append(StaticAssets.Css("account.css")).Append("\" />");
         sb.Append("<link rel=\"stylesheet\" href=\"").Append(StaticAssets.Css("report.css")).Append("\" />");
         sb.Append("</head><body>");
 
@@ -101,6 +102,7 @@ public static class ReportHtmlBuilder
         sb.Append("<script>window.reportSession=").Append(JsonSerializer.Serialize(data.SessionKey, JsonSafeHtml)).Append(";</script>");
         sb.Append("<script>window.diagnosisItems=").Append(diagnosisJson).Append(";</script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("report.js")).Append("\"></script>");
+        sb.Append("<script defer src=\"").Append(StaticAssets.Js("account.js")).Append("\"></script>");
         sb.Append("</body></html>");
         return sb.ToString();
     }

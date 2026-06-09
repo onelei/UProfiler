@@ -1,248 +1,345 @@
 <p align="right">
-  <img src="https://img.shields.io/badge/lang-English-blue?style=for-the-badge" alt="English">
-  <a href="README_CN.md"><img src="https://img.shields.io/badge/lang-&#31616;&#20307;&#20013;&#25991;-lightgrey?style=for-the-badge" alt="Simplified Chinese"></a>
+  <img src="https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge" alt="v1.1.0">
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新日志-lightgrey?style=for-the-badge" alt="Changelog"></a>
+  <img src="https://img.shields.io/badge/lang-简体中文-blue?style=for-the-badge" alt="简体中文">
+  <a href="README_EN.md"><img src="https://img.shields.io/badge/lang-English-lightgrey?style=for-the-badge" alt="English"></a>
 </p>
 
 # UProfiler
 
-Unity runtime performance profiler with a local web report server - a self-hosted workflow similar to UWA-style performance analysis.
+Unity 运行时性能采集 + 本地 Web 报告服务，对标 UWA 类性能分析工作流。
 
-The Unity client collects frame rate, memory, rendering, logs, and device metrics, uploads them over HTTP to a local server, and auto-generates visual HTML reports plus a project portal.
+Unity 端采集帧率、内存、渲染、日志、设备信息等数据，通过 HTTP 上传到本地服务器，自动生成可视化 HTML 报告与项目门户。服务器支持**飞书登录**、**账户设置**与可配置的访问权限。
 
-## Screenshots
+## 界面预览
 
-| Portal Home | Project Overview |
+| 项目门户首页 | 项目详情与测试服务 |
 |:---:|:---:|
-| ![Portal home](docs/screenshots/01-portal-home.png) | ![Project overview](docs/screenshots/02-project-overview.png) |
+| ![门户首页](docs/screenshots/01-portal-home.png) | ![项目概览](docs/screenshots/02-project-overview.png) |
 
-| Performance Analysis | Report Detail |
+| 总体性能分析 | 性能报告详情 |
 |:---:|:---:|
-| ![Performance analysis](docs/screenshots/03-performance-analysis.png) | ![Report detail](docs/screenshots/04-performance-report-detail.png) |
+| ![性能分析](docs/screenshots/03-performance-analysis.png) | ![报告详情](docs/screenshots/04-performance-report-detail.png) |
 
-## Project Structure
+## 项目结构
 
 ```
 UProfiler/
   docs/
-    screenshots/              # UI screenshots
-  UProfiler-Unity/              # Unity 2022.3 host project
-    Assets/                   # Samples imported via Package Manager
+    screenshots/              # 界面截图
+  UProfiler-Unity/              # Unity 2022.3 宿主工程
+    Assets/                   # Package Manager 导入的 Samples
     Packages/
-      com.lemonframework.uprofiler/   # Core UPM package
-      com.unity.nuget.mono-cecil/     # IL Hook dependency
+      com.lemonframework.uprofiler/   # 核心 UPM 包
+      com.unity.nuget.mono-cecil/     # IL Hook 依赖
     ProjectSettings/
-  UProfiler-Server/             # ASP.NET Core 8 report server
-    Program.cs                # Entry point & routes
-    Models/                   # Data models
-    Services/                 # Report generation, portal, indexing
-    wwwroot/                  # CSS / JS (includes ECharts)
-    start.bat                 # Start script
-    stop.bat                  # Stop script
-  UProfiler.sln                 # Solution file
+  UProfiler-Server/             # ASP.NET Core 8 报告服务器
+    Program.cs                # 入口与路由
+    Models/                   # 数据模型
+    Services/                 # 报告生成、门户、认证
+    wwwroot/                  # CSS / JS（含 ECharts）
+    auth.json                 # 认证配置（部署时编辑）
+    auth.example.json         # 认证配置模板
+    check-auth.ps1            # 启动前认证检查脚本
+    start.bat                 # 启动脚本
+    stop.bat                  # 停止脚本
+  UProfiler.sln                 # 解决方案
 ```
 
-## Requirements
+## 环境要求
 
-- Unity **2022.3 LTS** (project version 2022.3.62f3)
-- **.NET SDK 8+** (for the report server)
+- Unity **2022.3 LTS**（工程版本 2022.3.62f3）
+- **.NET SDK 8+**（运行报告服务器）
+- （可选）飞书开放平台企业自建应用（启用登录时）
 
-## Deployment & Configuration
+## 部署与配置
 
-UProfiler has two parts: **Unity client** (uploads data) and **report server** (receives data and generates reports). Both must use the **same host and port**.
+UProfiler 分为 **Unity 客户端**（采集并上传）和 **报告服务器**（接收数据并生成报告）两部分，两边的 **地址和端口必须一致**。
 
-### Configuration file (Unity)
+### 配置文件（Unity 端）
 
-All upload/report URLs are built from one file:
+所有上传、报告相关 URL 均由此文件统一生成：
 
 ```
 UProfiler-Unity/Packages/com.lemonframework.uprofiler/Runtime/Scripts/Core/Config.cs
 ```
 
-If you embed the package in your own project, edit `Config.cs` under your project's `Packages/com.lemonframework.uprofiler/` path.
+若将包集成到自己的工程，请修改你工程内 `Packages/com.lemonframework.uprofiler/` 下的 `Config.cs`。
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `IP` | `"localhost"` | Report server host. Used for file upload, report links, and callbacks. |
-| `Port` | `8080` | Report server port. Must match the running server. |
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `IP` | `"localhost"` | 报告服务器地址，用于上传、报告链接、回调等 |
+| `Port` | `8080` | 报告服务器端口，须与服务器实际监听端口一致 |
 
 ```csharp
 public static string IP = "localhost";
 public static int Port = 8080;
 ```
 
-Derived URLs (do **not** edit manually ? they follow `IP` and `Port`):
+以下属性由 `IP`、`Port` 自动拼接，**无需单独修改**：
 
-| Property | Purpose |
-|----------|---------|
+| 属性 | 用途 |
+|------|------|
 | `BaseUrl` | `http://{IP}:{Port}` |
-| `PostFileUrl` | Upload endpoint (`/TestHandler.ashx`) |
-| `ReportRecordUpdateRequestUrl` | Trigger report generation (`/ReceiveDataHandler.ashx`) |
-| `ReportUrl` | Portal base URL |
+| `PostFileUrl` | 文件上传接口（`/TestHandler.ashx`） |
+| `ReportRecordUpdateRequestUrl` | 触发报告生成（`/ReceiveDataHandler.ashx`） |
+| `ReportUrl` | 门户基础地址 |
 
-### Report server port
+### 报告服务器端口
 
-The server listens on **all network interfaces**. On startup it prints:
+服务器监听**所有网卡**。启动后控制台会输出：
 
 ```
 Local:   http://localhost:8080/
-Network: http://192.168.x.x:8080/    # your LAN IP, if available
+Network: http://192.168.x.x:8080/    # 本机局域网 IP（如有）
 ```
 
-Configure the server port in any of these ways (priority: CLI > env > default):
+可通过以下方式配置端口（优先级：命令行 > 环境变量 > 默认值）：
 
-| Method | Example |
-|--------|---------|
-| `start.bat` | Edit `set PORT=8080` at the top of `UProfiler-Server/start.bat` |
-| Command line | `dotnet run --project UProfiler-Server.csproj -c Release -- --port 8080` |
-| Environment variable | `MONITOR_TOOL_PORT=8080` |
+| 方式 | 示例 |
+|------|------|
+| `start.bat` | `start.bat 8080` 或修改脚本内 `set PORT=8080` |
+| 命令行 | `dotnet run --project UProfiler-Server.csproj -c Release -- --port 8080` |
+| 环境变量 | `MONITOR_TOOL_PORT=8080` |
 
-If the requested port is busy, the server tries the next port (+1 ? +10) and prints a reminder to update `Config.Port` in Unity.
+若请求端口被占用，服务器会自动尝试 +1～+10，并提示同步修改 Unity 端 `Config.Port`。
 
-### Deployment scenarios
+### 认证与飞书登录（可选）
 
-| Scenario | `Config.IP` | `Config.Port` | Notes |
-|----------|-------------|---------------|-------|
-| Unity Editor on same PC | `localhost` | `8080` | Default ? no changes needed |
-| Android / iOS device on LAN | Your PC's LAN IP | `8080` | Copy the `Network:` address from server console; **do not** use `localhost` |
-| Custom port | `localhost` or LAN IP | e.g. `9090` | Change `PORT` in `start.bat` **and** `Config.Port` together |
-| Remote server | Server IP or domain | Server port | Ensure firewall allows inbound TCP on that port |
+默认**不强制登录**（`auth.json` 中 `enabled: false`），适合本机调试。启用后，右上角显示账户头像，支持飞书 OAuth 登录与账户设置页。
 
-### Deployment checklist
+配置文件路径：`UProfiler-Server/auth.json`（首次启动可从 `auth.example.json` 自动复制）
 
-1. **Build & start the server**
+```json
+{
+  "enabled": false,
+  "requireAuthForView": true,
+  "requireAuthForUpload": false,
+  "sessionDays": 7,
+  "sessionSecret": "请改为随机字符串",
+  "feishu": {
+    "appId": "",
+    "appSecret": "",
+    "redirectUri": "http://localhost:8080/auth/feishu/callback"
+  },
+  "adminOpenIds": []
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `enabled` | 是否启用认证。`false` 时所有人可访问，不显示登录入口 |
+| `requireAuthForView` | 查看门户/报告是否需登录 |
+| `requireAuthForUpload` | Unity 上传接口是否需登录（局域网调试建议 `false`） |
+| `sessionSecret` | 会话签名密钥，生产环境务必修改 |
+| `feishu.appId` / `appSecret` | 飞书开放平台企业自建应用凭证 |
+| `feishu.redirectUri` | OAuth 回调地址，须与飞书应用「安全设置」中一致 |
+| `adminOpenIds` | 管理员飞书 Open ID 列表，拥有 `admin` 角色 |
+
+也可用环境变量覆盖（适合 CI / 容器部署）：
+
+| 环境变量 | 说明 |
+|----------|------|
+| `UPROFILER_AUTH_ENABLED` | 是否启用认证 |
+| `UPROFILER_AUTH_REQUIRE_VIEW` | 查看是否需登录 |
+| `UPROFILER_AUTH_REQUIRE_UPLOAD` | 上传是否需登录 |
+| `UPROFILER_FEISHU_APP_ID` | 飞书 App ID |
+| `UPROFILER_FEISHU_APP_SECRET` | 飞书 App Secret |
+| `UPROFILER_FEISHU_REDIRECT_URI` | OAuth 回调地址 |
+| `UPROFILER_AUTH_SECRET` | 会话签名密钥 |
+| `UPROFILER_ADMIN_OPEN_IDS` | 管理员 Open ID（逗号分隔） |
+
+#### 飞书应用配置步骤
+
+1. 登录 [飞书开放平台](https://open.feishu.cn/)，创建**企业自建应用**
+2. 在「凭证与基础信息」获取 **App ID**、**App Secret**
+3. 在「安全设置 → 重定向 URL」添加：`http://<服务器地址>:<端口>/auth/feishu/callback`
+4. 开启获取用户基本信息的权限
+5. 将凭证填入 `auth.json`，设置 `"enabled": true`
+6. 运行 `start.bat` — 启动前会自动检查配置是否完整
+
+`start.bat` 启动时会执行 `check-auth.ps1`：若 `enabled: true` 但飞书凭证未填写，将阻止启动并给出提示。
+
+用户数据保存在服务器运行目录下的 `users.json`。
+
+### 常见部署场景
+
+| 场景 | `Config.IP` | `Config.Port` | 说明 |
+|------|-------------|---------------|------|
+| 本机 Unity Editor 调试 | `localhost` | `8080` | 默认配置，无需修改 |
+| Android / iOS 真机（局域网） | 运行服务器的电脑局域网 IP | `8080` | 使用控制台 `Network:` 一行中的地址，**不能用** `localhost` |
+| 自定义端口 | `localhost` 或局域网 IP | 如 `9090` | 同时修改 `start.bat` 的 `PORT` 与 `Config.Port` |
+| 远程服务器 + 飞书登录 | 服务器 IP 或域名 | 服务器端口 | 防火墙放行端口；`redirectUri` 改为公网地址 |
+
+### 部署步骤
+
+1. **编译并启动服务器**
    ```bat
    cd UProfiler-Server
    start.bat
    ```
-2. **Note the port** shown in the console (default `8080`).
-3. **Edit `Config.cs`** ? set `IP` and `Port` to match the server.
-4. **Open firewall** (LAN/device only) ? allow inbound TCP on the server port.
-5. **Run Unity** ? use `UProfiler.prefab` or `UProfilerSample.unity`, start/stop monitoring.
-6. **Open reports** ? browser: `http://<IP>:<Port>/`
+2. **确认控制台显示的端口**（默认 `8080`）及认证状态。
+3. **修改 `Config.cs`** — 将 `IP`、`Port` 改为与服务器一致。
+4. **（可选）配置 `auth.json`** — 启用飞书登录与权限控制。
+5. **放行防火墙**（真机/局域网场景）— 允许入站 TCP 访问服务器端口。
+6. **运行 Unity** — 使用 `UProfiler.prefab` 或 `UProfilerSample.unity`，开始/停止监控。
+7. **查看报告** — 浏览器访问 `http://<IP>:<Port>/`
 
-### Android / device notes
+### 真机调试说明
 
-- Set `Config.IP` to the **PC running UProfiler-Server**, not the device itself.
-- Phone and PC must be on the same network.
-- Unity uses plain HTTP; the Editor project auto-enables `InsecureHttpOption.AlwaysAllowed` via `AllowInsecureHttpSetting.cs`.
+- `Config.IP` 填**运行 UProfiler-Server 的电脑**地址，不是手机地址。
+- 手机与电脑须在同一局域网。
+- Unity 使用 HTTP 明文传输；Editor 工程会通过 `AllowInsecureHttpSetting.cs` 自动开启 `InsecureHttpOption.AlwaysAllowed`。
 
-## Quick Start
+## 快速开始
 
-### 1. Configure Unity upload address
+### 1. 配置 Unity 上传地址
 
-See [Deployment & Configuration](#deployment--configuration) for full details. For local debugging, defaults in `Config.cs` are enough:
+完整说明见 [部署与配置](#部署与配置)。本机 Editor 调试使用 `Config.cs` 默认值即可：
 
 ```csharp
 public static string IP = "localhost";
 public static int Port = 8080;
 ```
 
-### 2. Start the report server
+### 2. 启动报告服务器
 
-Start the server **before** running Unity:
+建议在 Unity 运行**之前**启动服务器：
 
 ```bat
 cd UProfiler-Server
 start.bat
 ```
 
-Listens on port **8080** by default. If the port is busy, the server tries +1 through +10 and prints a message to update `Config.Port` accordingly.
+默认监听 **8080** 端口。启动脚本会依次：检查端口 → 检查认证配置 → 编译 → 启动服务。
 
-Close the window or press `Ctrl+C` to stop. You can also run `stop.bat` to free the port.
+关闭窗口或按 `Ctrl+C` 停止服务，也可运行 `stop.bat` 释放端口。
 
-### 3. Collect data in Unity
+### 3. Unity 中采集数据
 
-1. Open the `UProfiler-Unity` project in Unity Hub
-2. Open the built-in scene `Packages/com.lemonframework.uprofiler/Runtime/Scenes/UProfilerSample.unity`, or place `UProfiler.prefab` in your scene
-3. Play and click **Start Monitoring** / **Stop Monitoring**
-4. After stopping, data is uploaded automatically and a report is generated
+1. 用 Unity Hub 打开 `UProfiler-Unity` 工程
+2. 打开内置场景 `Packages/com.lemonframework.uprofiler/Runtime/Scenes/UProfilerSample.unity`，或在场景中使用 `UProfiler.prefab`
+3. 运行后点击 **开始监控** / **停止监控**
+4. 停止后数据自动上传到服务器并生成报告
 
-Use the Editor menu **UProfiler > Download** to open the local download folder.
+Editor 菜单 **UProfiler > Download** 可打开本地下载目录。
 
-### 4. View reports
+### 4. 查看报告
 
-Open `http://<IP>:8080/` in a browser for the project portal, or go directly to a session report:
+浏览器访问 `http://<IP>:8080/` 进入项目门户，或直接打开单次报告：
 
 ```
 http://<IP>:8080/report_{TestTime}.html
 ```
 
-`TestTime` is the session timestamp, e.g. `2026_06_04_10_34_06`.
+`TestTime` 为会话时间戳，例如 `2026_06_04_10_34_06`。
 
-## Data Flow
+启用认证后，还可访问：
+
+- 登录页：`http://<IP>:<Port>/login`
+- 账户设置：`http://<IP>:<Port>/account/profile`
+
+## 数据流
 
 ```
 Unity (UProfilerHost)
-  -> local .txt / .data files
+  -> 本地 .txt / .data 文件
   -> POST /TestHandler.ashx
   -> uploads/{session}/
   -> GET /ReceiveDataHandler.ashx
   -> reports/report_{session}.html
-  -> browser portal / report page
+  -> 浏览器访问门户 / 报告页
 ```
 
-## Unity Package Layout
+## Unity 包结构
 
-| Path | Description |
-|------|-------------|
-| `Runtime/Scripts/Core` | Core logic: config, collection, upload, hook |
-| `Runtime/Scripts/Components` | Runtime components: `UProfilerHost`, HUD, Android proxy |
-| `Runtime/Scenes` | Built-in sample scene `UProfilerSample.unity` |
-| `Runtime/Prefabs` | `UProfiler.prefab` |
-| `Runtime/Plugins` | SharpZipLib, Android AAR |
-| `Editor` | Menu items, IL hook injection, HTTP settings |
-| `Samples~` | Optional samples (import via Package Manager) |
+| 路径 | 说明 |
+|------|------|
+| `Runtime/Scripts/Core` | 核心逻辑：配置、采集、上传、Hook |
+| `Runtime/Scripts/Components` | 运行时组件：`UProfilerHost`、HUD、Android 代理 |
+| `Runtime/Scenes` | 内置示例场景 `UProfilerSample.unity` |
+| `Runtime/Prefabs` | `UProfiler.prefab` 预制体 |
+| `Runtime/Plugins` | SharpZipLib、Android AAR |
+| `Editor` | 菜单项、IL Hook 注入、HTTP 设置 |
+| `Samples~` | 可选示例（Package Manager 导入） |
 
-### Optional Samples
+### 可选 Samples
 
-Import samples from **LemonFramework UProfiler** in Package Manager:
+在 Package Manager 中导入 **LemonFramework UProfiler** 的 Samples：
 
-| Sample | Description |
+| Sample | 说明 |
 |--------|-------------|
-| File Upload | HTTP file upload demo |
-| Method Inject | IL hook & function profiling |
-| Android Interact | Unity-Android JNI interaction demo |
+| File Upload | HTTP 文件上传演示 |
+| Method Inject | IL Hook 与函数性能分析 |
+| Android Interact | Unity-Android JNI 交互演示 |
 
-### Collected Metrics
+### 采集指标
 
-- Frame rate (FPS)
-- Unity runtime logs
-- Device info
-- Resource memory distribution (Texture, Mesh, Material, etc.)
-- Rendering stats (DrawCall, SetPassCall, vertices/triangles)
-- Function profiling (requires IL hook injection in Editor)
-- Android PSS / power consumption (on device)
+- 帧率（FPS）
+- Unity 运行日志
+- 设备信息
+- 资源内存分布（Texture、Mesh、Material 等）
+- 渲染统计（DrawCall、SetPassCall、顶点/三角形）
+- 函数性能（需 Editor 执行 IL Hook 注入）
+- Android PSS / 功耗（真机）
 
-## Report Server Layout
+## 报告服务器结构
 
-| Path | Description |
-|------|-------------|
-| `Program.cs` | Routes: `TestHandler.ashx`, `ReceiveDataHandler.ashx`, portal & report pages |
-| `Services/UploadIndex.cs` | Upload file index |
-| `Services/ReportGenerator.cs` | Parse data and generate HTML reports |
-| `Services/ReportHtmlBuilder.cs` | Single-session report page |
-| `Services/PortalHtmlBuilder.cs` | Project portal & performance pages |
-| `Services/ProjectCatalog.cs` | Aggregate projects by PackageName |
-| `wwwroot/css/` | `portal.css`, `report.css` |
-| `wwwroot/js/` | `portal-trend.js`, `report.js`, ECharts |
+| 路径 | 说明 |
+|------|------|
+| `Program.cs` | 路由：上传、报告、门户、认证 |
+| `Services/UploadIndex.cs` | 上传文件索引 |
+| `Services/ReportGenerator.cs` | 解析数据并生成 HTML 报告 |
+| `Services/ReportHtmlBuilder.cs` | 单次报告页面 |
+| `Services/PortalHtmlBuilder.cs` | 项目门户与性能分析页 |
+| `Services/AccountHtmlBuilder.cs` | 登录页与账户设置页 |
+| `Services/FeishuOAuthService.cs` | 飞书 OAuth |
+| `Services/UserStore.cs` | 用户资料存储 |
+| `Services/ProjectCatalog.cs` | 按 PackageName 聚合项目 |
+| `wwwroot/css/` | `portal.css`、`report.css`、`account.css` |
+| `wwwroot/js/` | `portal-trend.js`、`report.js`、`account.js`、ECharts |
 
-Runtime directories (auto-created under the output folder):
+运行时目录（由服务器自动创建，位于输出目录下）：
 
-- `uploads/` - raw uploaded data
-- `reports/` - generated HTML reports
-- `logs/` - server logs
+- `uploads/` - 上传的原始数据
+- `reports/` - 生成的 HTML 报告
+- `logs/` - 服务器日志
+- `users.json` - 用户账户数据（启用认证后）
 
-## API Endpoints
+## API 端点
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/TestHandler.ashx` | POST | Receive multipart file uploads |
-| `/ReceiveDataHandler.ashx` | GET | Trigger report generation |
-| `/` | GET | Project portal home |
-| `/project/{package}/` | GET | Project detail |
-| `/project/{package}/performance` | GET | Overall performance analysis |
-| `/report_{session}.html` | GET | Single test report |
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/TestHandler.ashx` | POST | 接收 multipart 文件上传 |
+| `/ReceiveDataHandler.ashx` | GET | 触发报告生成 |
+| `/` | GET | 项目门户首页 |
+| `/project/{package}/` | GET | 项目详情 |
+| `/project/{package}/performance` | GET | 总体性能分析 |
+| `/report_{session}.html` | GET | 单次测试报告 |
+| `/login` | GET | 登录页（飞书） |
+| `/auth/feishu` | GET | 跳转飞书授权 |
+| `/auth/feishu/callback` | GET | 飞书 OAuth 回调 |
+| `/auth/logout` | POST | 退出登录 |
+| `/account/profile` | GET | 个人信息设置 |
+| `/account/settings` | GET | 账户资料 |
+| `/api/account/profile` | POST | 保存个人信息 |
+
+## 版本与更新日志
+
+当前版本：**1.1.0**（见根目录 `VERSION`）
+
+- 中文更新日志：[CHANGELOG.md](CHANGELOG.md)
+- English changelog: [CHANGELOG_EN.md](CHANGELOG_EN.md)
+
+发版时可用脚本同步版本号：
+
+```powershell
+.\scripts\sync-changelog.ps1 -ListCommits    # 查看 git 提交
+.\scripts\sync-changelog.ps1 -Bump patch     # 递增补丁版本（1.1.0 → 1.1.1）
+```
+
+脚本会自动更新 `VERSION`、`package.json`、服务器程序集版本、Unity `UProfilerVersion` 与 README 版本徽章；随后在 CHANGELOG 中补充对应条目即可。
 
 ## License
 
-TBD
+待定
