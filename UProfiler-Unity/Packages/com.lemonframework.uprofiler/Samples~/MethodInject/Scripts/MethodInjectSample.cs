@@ -49,12 +49,12 @@ namespace LemonFramework.UProfiler.Samples
         [ProfilerSample]
         public void Test()
         {
-            Debug.Log("Loop start (100 iterations)");
+            Debug.Log("开始循环100次");
             for (int i = 0; i < 100; i++)
             {
                 Debug.Log(i);
             }
-            Debug.Log("Loop finished (100 iterations)");
+            Debug.Log("完成循环100次");
         }
 
         [FunctionAnalysis]
@@ -62,11 +62,11 @@ namespace LemonFramework.UProfiler.Samples
         public void TestDefine()
         {
             Profiler.BeginSample("*************");
-            Debug.Log("TestDefine sample method");
+            Debug.Log("测试自定义的方法");
             Profiler.EndSample();
         }
 
-        [HideAnalysis]
+        [HideAnalysis] //不需要分析的后函数
         private void OnGUI()
         {
         }

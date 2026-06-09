@@ -137,7 +137,84 @@ public sealed class DiagnosisItem
     public List<string> Suggestions { get; init; } = new();
 }
 
-public sealed class ReportDataContext
+public sealed class CaptureFrameManifest
+{
+    public string SessionKey { get; init; } = "";
+    public SortedDictionary<int, string> FrameImages { get; init; } = new();
+    public string? DeviceModel { get; init; }
+}
+
+public sealed class ModuleMeta
+{
+    public string Key { get; init; } = "";
+    public string Label { get; init; } = "";
+    public string Color { get; init; } = "";
+    public double RecommendMs { get; init; }
+}
+
+public sealed class ModuleSummaryRow
+{
+    public string Key { get; init; } = "";
+    public string Label { get; init; } = "";
+    public string Color { get; init; } = "";
+    public double AverageMs { get; init; }
+    public double RecommendMs { get; init; }
+    public bool OverRecommend { get; init; }
+}
+
+public sealed class ModuleTimePayload
+{
+    public List<ModuleMeta> Modules { get; init; } = new();
+    public List<int> X { get; init; } = new();
+    public Dictionary<string, List<double>> Series { get; init; } = new();
+    public List<ModuleSummaryRow> Summary { get; init; } = new();
+}
+
+public sealed class ModuleDetailPieSlice
+{
+    public string Name { get; init; } = "";
+    public double Value { get; init; }
+    public string Color { get; init; } = "";
+}
+
+public sealed class ModuleDetailMetricRow
+{
+    public string Name { get; init; } = "";
+    public double AverageMs { get; init; }
+    public double Ratio { get; init; }
+    public string Unit { get; init; } = "ms";
+    public string? LinkTarget { get; init; }
+}
+
+public sealed class ModuleDetailSeries
+{
+    public string Key { get; init; } = "";
+    public string Label { get; init; } = "";
+    public string Color { get; init; } = "";
+    public List<double> Data { get; init; } = new();
+    public int YAxisIndex { get; init; }
+    public string Unit { get; init; } = "ms";
+}
+
+public sealed class ModuleDetailPayload
+{
+    public string Key { get; init; } = "";
+    public string Label { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string DetailTitle { get; init; } = "";
+    public string PieTitle { get; init; } = "";
+    public string ChartTitle { get; init; } = "";
+    public string Color { get; init; } = "";
+    public bool HasDrillDown { get; init; }
+    public string? EmptyHint { get; init; }
+    public List<ModuleDetailPieSlice> PieSlices { get; init; } = new();
+    public List<ModuleDetailMetricRow> Metrics { get; init; } = new();
+    public List<int> X { get; init; } = new();
+    public List<ModuleDetailSeries> Series { get; init; } = new();
+    public bool DualAxis { get; init; }
+}
+
+public sealed record ReportDataContext
 {
     public required string SessionKey { get; init; }
     public string? PackageName { get; init; }
@@ -151,6 +228,9 @@ public sealed class ReportDataContext
     public List<FuncAnalysisInfoDto> FuncAnalysis { get; init; } = new();
     public List<string> LogLines { get; init; } = new();
     public IReadOnlyList<SessionUpload> Files { get; init; } = Array.Empty<SessionUpload>();
+    public CaptureFrameManifest CaptureFrames { get; init; } = new();
+    public ModuleTimePayload ModuleTime { get; init; } = new();
+    public Dictionary<string, ModuleDetailPayload> ModuleDetails { get; init; } = new();
 
     public double AvgFps { get; init; }
     public int MinFps { get; init; }

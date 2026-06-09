@@ -2,14 +2,26 @@
   'use strict';
 
   const chartInstances = [];
+  const chartRegistry = [];
   let echartsPromise = null;
+  let selectedSampleFrame = null;
+  let currentSampleIndex = -1;
+  let moduleChartInstance = null;
+  let modulePieInstance = null;
+  let moduleDetailPieInstance = null;
+  let moduleDetailChartInstance = null;
+  let currentModuleKey = null;
+
+  function escapeHtml(text) {
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 
   function loadEcharts() {
     if (window.echarts) return Promise.resolve(window.echarts);
     if (echartsPromise) return echartsPromise;
     echartsPromise = new Promise(function (resolve, reject) {
       var script = document.createElement('script');
-      script.src = '/js/vendor/echarts.min.js?v=2';
+      script.src = '/js/vendor/echarts.min.js?v=9';
       script.async = true;
       script.onload = function () { resolve(window.echarts); };
       script.onerror = function () {
@@ -29,53 +41,400 @@
     return [{ type: 'inside' }, { type: 'slider' }];
   }
 
+  function axisPointerLine() {
+    return { type: 'line', triggerOn: 'mousemove', lineStyle: { color: '#91caff', width: 1, type: 'dashed' } };
+  }
+
+  function getSampleFrames() {
+    if (window.capturePayload && capturePayload.frames && capturePayload.frames.length) {
+      return capturePayload.frames.slice().sort(function (a, b) { return a - b; });
+    }
+    if (window.modulePayload && modulePayload.x && modulePayload.x.length) {
+      return modulePayload.x.slice();
+    }
+    return [];
+  }
+
+  function findNearestDataIndex(xValues, frameIndex) {
+    if (!xValues || !xValues.length) return -1;
+    return xValues.reduce(function (best, value, index) {
+      return Math.abs(value - frameIndex) < Math.abs(xValues[best] - frameIndex) ? index : best;
+    }, 0);
+  }
+
+  function findSampleIndex(frameIndex) {
+    var frames = getSampleFrames();
+    if (!frames.length) return -1;
+    return frames.reduce(function (best, value, index) {
+      return Math.abs(value - frameIndex) < Math.abs(frames[best] - frameIndex) ? index : best;
+    }, 0);
+  }
+
+  function toFrameNumber(value) {
+    if (value == null) return null;
+    var n = typeof value === 'number' ? value : parseInt(String(value), 10);
+    return isNaN(n) ? null : n;
+  }
+
+  function captureUrl(frameIndex) {
+    if (!window.reportSession || frameIndex == null) return '';
+    return '/capture/' + encodeURIComponent(reportSession) + '/' + frameIndex + '.png';
+  }
+
+  function updateCaptureNavState() {
+    var frames = getSampleFrames();
+    var prevBtn = document.getElementById('capturePrev');
+    var nextBtn = document.getElementById('captureNext');
+    var navInfo = document.getElementById('captureNavInfo');
+    if (navInfo) {
+      navInfo.textContent = frames.length
+        ? (currentSampleIndex + 1) + ' / ' + frames.length
+        : '- / -';
+    }
+    if (prevBtn) prevBtn.disabled = currentSampleIndex <= 0;
+    if (nextBtn) nextBtn.disabled = currentSampleIndex < 0 || currentSampleIndex >= frames.length - 1;
+  }
+
+  function renderCaptureImage(captureFrame) {
+    var image = document.getElementById('captureImage');
+    var placeholder = document.getElementById('capturePlaceholder');
+    if (!image || !placeholder) return;
+
+    if (!window.capturePayload || !capturePayload.hasCaptures) {
+      image.style.display = 'none';
+      placeholder.style.display = 'flex';
+      placeholder.textContent = '该会话未上传截图';
+      return;
+    }
+
+    var url = captureUrl(captureFrame) + '?t=' + captureFrame;
+    if (image.dataset.currentSrc === url && image.complete && image.naturalWidth > 0) {
+      image.style.display = 'block';
+      placeholder.style.display = 'none';
+      return;
+    }
+    image.dataset.currentSrc = url;
+    image.onload = function () {
+      image.style.display = 'block';
+      placeholder.style.display = 'none';
+    };
+    image.onerror = function () {
+      image.style.display = 'none';
+      placeholder.style.display = 'flex';
+      placeholder.textContent = '截图加载失败';
+    };
+    image.src = url;
+  }
+
+  function updateCapturePanelMeta(captureFrame) {
+    var panel = document.getElementById('capturePanel');
+    var scene = document.getElementById('captureScene');
+    var frameLabel = document.getElementById('captureFrameLabel');
+    var device = document.getElementById('captureDevice');
+    if (!panel) return;
+
+    panel.classList.remove('hidden');
+    if (scene && window.capturePayload) {
+      scene.textContent = capturePayload.productName || '当前场景';
+    }
+    if (frameLabel) {
+      frameLabel.textContent = '第 ' + captureFrame + ' 帧';
+    }
+    if (device && window.capturePayload) {
+      var parts = [];
+      if (capturePayload.deviceModel) parts.push(capturePayload.deviceModel);
+      if (capturePayload.platform) parts.push(capturePayload.platform);
+      if (capturePayload.version) parts.push('v' + capturePayload.version);
+      device.textContent = parts.join(' · ') || '-';
+    }
+    updateCaptureNavState();
+  }
+
+  function buildFrameMarkerSeries(xValues) {
+    return {
+      id: 'frame-marker',
+      name: '__frameMarker__',
+      type: 'line',
+      data: (xValues || []).map(function () { return 0; }),
+      symbol: 'none',
+      lineStyle: { width: 0, opacity: 0 },
+      itemStyle: { opacity: 0 },
+      emphasis: { disabled: true },
+      silent: true,
+      z: 20,
+      animation: false,
+      markLine: {
+        silent: true,
+        symbol: ['none', 'none'],
+        animation: false,
+        lineStyle: { color: '#1677ff', width: 3, type: 'solid' },
+        label: { show: false },
+        data: []
+      }
+    };
+  }
+
+  function ensureFrameMarkerSeries(chart, xValues) {
+    var option = chart.getOption();
+    var series = option.series || [];
+    for (var i = 0; i < series.length; i++) {
+      if (series[i].id === 'frame-marker') {
+        return;
+      }
+    }
+    chart.setOption({
+      series: series.concat([buildFrameMarkerSeries(xValues)])
+    });
+  }
+
+  function applySelectionLine(chart, xValue, xValues) {
+    if (!chart || xValue == null || !xValues || !xValues.length) return;
+    ensureFrameMarkerSeries(chart, xValues);
+
+    var dataIndex = findNearestDataIndex(xValues, xValue);
+    var catLabel = String(xValues[dataIndex]);
+    var markLineOpt = {
+      silent: true,
+      symbol: ['none', 'none'],
+      animation: false,
+      lineStyle: { color: '#1677ff', width: 3, type: 'solid' },
+      label: { show: false },
+      data: [[
+        { xAxis: catLabel, yAxis: 'min' },
+        { xAxis: catLabel, yAxis: 'max' }
+      ]]
+    };
+
+    function drawLine() {
+      chart.setOption({
+        series: [{
+          id: 'frame-marker',
+          markLine: markLineOpt
+        }]
+      });
+    }
+
+    drawLine();
+    requestAnimationFrame(drawLine);
+  }
+
+  function syncChartEntry(entry, frameIndex) {
+    if (!entry || !entry.chart || !entry.xValues || !entry.xValues.length) return;
+    var dataIndex = findNearestDataIndex(entry.xValues, frameIndex);
+    if (dataIndex < 0) return;
+    var xValue = entry.xValues[dataIndex];
+
+    entry.chart.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: dataIndex });
+    applySelectionLine(entry.chart, xValue, entry.xValues);
+  }
+
+  function syncAllCharts(frameIndex) {
+    chartRegistry.forEach(function (entry) {
+      syncChartEntry(entry, frameIndex);
+    });
+  }
+
+  function updateModulePieForFrame(frameIndex) {
+    if (!modulePieInstance || !window.modulePayload) return;
+    var xIndex = modulePayload.x.indexOf(frameIndex);
+    if (xIndex < 0) {
+      xIndex = findNearestDataIndex(modulePayload.x, frameIndex);
+    }
+    if (xIndex < 0) return;
+
+    var data = modulePayload.modules.map(function (module) {
+      var values = modulePayload.series[module.key] || [];
+      return {
+        name: module.label,
+        value: values[xIndex] || 0,
+        itemStyle: { color: module.color }
+      };
+    });
+    modulePieInstance.setOption({ series: [{ data: data }] });
+  }
+
+  function selectSampleFrame(frameIndex) {
+    frameIndex = toFrameNumber(frameIndex);
+    if (frameIndex == null) return;
+
+    var frames = getSampleFrames();
+    if (!frames.length) {
+      selectedSampleFrame = frameIndex;
+      currentSampleIndex = -1;
+      updateCapturePanelMeta(frameIndex);
+      renderCaptureImage(frameIndex);
+      syncAllCharts(frameIndex);
+      updateModulePieForFrame(frameIndex);
+      return;
+    }
+
+    var sampleIndex = -1;
+    for (var i = 0; i < frames.length; i++) {
+      if (frames[i] === frameIndex) {
+        sampleIndex = i;
+        break;
+      }
+    }
+    if (sampleIndex < 0) {
+      sampleIndex = findSampleIndex(frameIndex);
+      frameIndex = frames[sampleIndex];
+    }
+
+    selectedSampleFrame = frameIndex;
+    currentSampleIndex = sampleIndex;
+
+    updateCapturePanelMeta(frameIndex);
+    renderCaptureImage(frameIndex);
+    syncAllCharts(frameIndex);
+    updateModulePieForFrame(frameIndex);
+  }
+
+  function navigateSample(delta) {
+    var frames = getSampleFrames();
+    if (!frames.length) return;
+    var nextIndex = currentSampleIndex + delta;
+    if (nextIndex < 0 || nextIndex >= frames.length) return;
+    selectSampleFrame(frames[nextIndex]);
+  }
+
+  function registerChart(chart, xValues, chartType) {
+    if (!chart || !xValues || !xValues.length) return;
+    var entry = { chart: chart, xValues: xValues, type: chartType };
+    chartRegistry.push(entry);
+    chart.on('datazoom', function () {
+      if (selectedSampleFrame != null) {
+        applySelectionLine(chart, selectedSampleFrame, xValues);
+      }
+    });
+    chart.on('finished', function () {
+      if (selectedSampleFrame != null) {
+        applySelectionLine(chart, selectedSampleFrame, xValues);
+      }
+    });
+    if (selectedSampleFrame != null) {
+      syncChartEntry(entry, selectedSampleFrame);
+    }
+  }
+
+  function resolveFrameFromChartClick(chart, xValues, params, pointer) {
+    if (params && params.componentType === 'series' && params.dataIndex != null) {
+      return toFrameNumber(xValues[params.dataIndex]);
+    }
+    var point = pointer || (params && params.event ? [params.event.offsetX, params.event.offsetY] : null);
+    if (!point || !chart.containPixel({ gridIndex: 0 }, point)) return null;
+    var coord = chart.convertFromPixel({ gridIndex: 0 }, point);
+    if (!coord || coord[0] == null || isNaN(coord[0])) return null;
+    var dataIndex = Math.round(coord[0]);
+    if (dataIndex < 0) dataIndex = 0;
+    if (dataIndex >= xValues.length) dataIndex = xValues.length - 1;
+    return toFrameNumber(xValues[dataIndex]);
+  }
+
+  function bindChartFrameSelection(chart, xValues) {
+    if (!chart || !xValues || !xValues.length) return;
+
+    var lastPickAt = 0;
+    function pickFrame(pointer, params) {
+      var now = Date.now();
+      if (now - lastPickAt < 80) return;
+      var frameIndex = resolveFrameFromChartClick(chart, xValues, params, pointer);
+      if (frameIndex == null) return;
+      lastPickAt = now;
+      selectSampleFrame(frameIndex);
+    }
+
+    chart.on('click', function (params) {
+      if (!params.event) return;
+      pickFrame([params.event.offsetX, params.event.offsetY], params);
+    });
+
+    chart.getZr().on('click', function (event) {
+      pickFrame([event.offsetX, event.offsetY], null);
+    });
+  }
+
+  function initCapturePanel() {
+    var expandBtn = document.getElementById('captureExpand');
+    var prevBtn = document.getElementById('capturePrev');
+    var nextBtn = document.getElementById('captureNext');
+    var modal = document.getElementById('captureModal');
+    var modalImage = document.getElementById('captureModalImage');
+    var modalClose = document.getElementById('captureModalClose');
+    var image = document.getElementById('captureImage');
+
+    if (prevBtn) prevBtn.onclick = function () { navigateSample(-1); };
+    if (nextBtn) nextBtn.onclick = function () { navigateSample(1); };
+
+    if (expandBtn && modal && modalImage && image) {
+      expandBtn.onclick = function () {
+        if (!image.src) return;
+        modalImage.src = image.src;
+        modal.classList.remove('hidden');
+      };
+    }
+    if (modal && modalClose) {
+      modalClose.onclick = function () { modal.classList.add('hidden'); };
+      modal.onclick = function (event) {
+        if (event.target === modal) modal.classList.add('hidden');
+      };
+    }
+
+    document.addEventListener('keydown', function (event) {
+      var panel = document.getElementById('capturePanel');
+      if (!panel || panel.classList.contains('hidden')) return;
+      if (event.key === 'ArrowLeft') navigateSample(-1);
+      if (event.key === 'ArrowRight') navigateSample(1);
+    });
+  }
+
   function buildOption(type) {
     if (!window.chartPayload) return null;
     var p = window.chartPayload;
+    var tooltipBase = { trigger: 'axis', axisPointer: axisPointerLine() };
     if (type === 'fps') {
       return {
-        tooltip: { trigger: 'axis' },
+        tooltip: tooltipBase,
         grid: { left: 50, right: 20, top: 30, bottom: 50 },
         xAxis: { type: 'category', data: p.fps.x, name: '帧' },
         yAxis: { type: 'value', name: 'FPS' },
         dataZoom: baseZoom(),
-        series: [{ name: 'FPS', type: 'line', smooth: true, showSymbol: false, data: p.fps.y, itemStyle: { color: '#1677ff' } }]
+        series: [{ name: 'FPS', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.fps.y, itemStyle: { color: '#1677ff' } }]
       };
     }
     if (type === 'memory') {
       return {
-        tooltip: { trigger: 'axis' },
+        tooltip: tooltipBase,
         legend: { top: 0 },
         grid: { left: 50, right: 20, top: 40, bottom: 50 },
         xAxis: { type: 'category', data: p.memory.x, name: '帧' },
         yAxis: { type: 'value', name: 'MB' },
         dataZoom: baseZoom(),
         series: [
-          { name: 'MonoUsed', type: 'line', smooth: true, showSymbol: false, data: p.memory.monoUsed, itemStyle: { color: '#722ed1' } },
-          { name: 'TotalAllocated', type: 'line', smooth: true, showSymbol: false, data: p.memory.totalAllocated, itemStyle: { color: '#1677ff' } },
-          { name: 'UnityReserved', type: 'line', smooth: true, showSymbol: false, data: p.memory.unityReserved, itemStyle: { color: '#13c2c2' } }
+          { name: 'MonoUsed', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.memory.monoUsed, itemStyle: { color: '#722ed1' } },
+          { name: 'TotalAllocated', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.memory.totalAllocated, itemStyle: { color: '#1677ff' } },
+          { name: 'UnityReserved', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.memory.unityReserved, itemStyle: { color: '#13c2c2' } }
         ]
       };
     }
     if (type === 'render') {
       return {
-        tooltip: { trigger: 'axis' },
+        tooltip: tooltipBase,
         legend: { top: 0 },
         grid: { left: 50, right: 20, top: 40, bottom: 50 },
         xAxis: { type: 'category', data: p.render.x, name: '帧' },
         yAxis: { type: 'value' },
         dataZoom: baseZoom(),
         series: [
-          { name: 'SetPassCall', type: 'line', smooth: true, showSymbol: false, data: p.render.setPass, itemStyle: { color: '#ff4d4f' } },
-          { name: 'DrawCall', type: 'line', smooth: true, showSymbol: false, data: p.render.drawCall, itemStyle: { color: '#1677ff' } },
-          { name: '顶点', type: 'line', smooth: true, showSymbol: false, data: p.render.vertices, itemStyle: { color: '#fa8c16' } },
-          { name: '三角面', type: 'line', smooth: true, showSymbol: false, data: p.render.triangles, itemStyle: { color: '#52c41a' } }
+          { name: 'SetPassCall', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.render.setPass, itemStyle: { color: '#ff4d4f' } },
+          { name: 'DrawCall', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.render.drawCall, itemStyle: { color: '#1677ff' } },
+          { name: '顶点', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.render.vertices, itemStyle: { color: '#fa8c16' } },
+          { name: '三角面', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.render.triangles, itemStyle: { color: '#52c41a' } }
         ]
       };
     }
     if (type === 'power') {
       return {
-        tooltip: { trigger: 'axis' },
+        tooltip: tooltipBase,
         legend: { top: 0 },
         grid: { left: 50, right: 20, top: 40, bottom: 50 },
         xAxis: { type: 'category', data: p.power.x, name: '帧' },
@@ -89,15 +448,62 @@
     }
     if (type === 'pss') {
       return {
-        tooltip: { trigger: 'axis' },
+        tooltip: tooltipBase,
         grid: { left: 50, right: 20, top: 30, bottom: 50 },
         xAxis: { type: 'category', data: p.pss.x, name: '帧' },
         yAxis: { type: 'value', name: 'MB' },
         dataZoom: baseZoom(),
-        series: [{ name: 'PSS', type: 'line', smooth: true, showSymbol: false, areaStyle: {}, data: p.pss.y, itemStyle: { color: '#1677ff' } }]
+        series: [{ name: 'PSS', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, areaStyle: {}, data: p.pss.y, itemStyle: { color: '#1677ff' } }]
       };
     }
+    if (type === 'module') {
+      return buildModuleChartOption();
+    }
     return null;
+  }
+
+  function buildModuleChartOption() {
+    if (!window.modulePayload || !modulePayload.x || !modulePayload.x.length) return null;
+    var series = modulePayload.modules.map(function (module) {
+      return {
+        name: module.label,
+        type: 'line',
+        stack: 'module',
+        areaStyle: { opacity: 0.85 },
+        showSymbol: true,
+        symbolSize: 6,
+        triggerLineEvent: true,
+        emphasis: { focus: 'series' },
+        data: modulePayload.series[module.key] || [],
+        itemStyle: { color: module.color }
+      };
+    });
+    return {
+      tooltip: { trigger: 'axis', axisPointer: axisPointerLine() },
+      legend: { type: 'scroll', top: 0, data: modulePayload.modules.map(function (m) { return m.label; }) },
+      grid: { left: 50, right: 20, top: 48, bottom: 50 },
+      xAxis: { type: 'category', data: modulePayload.x, name: '帧' },
+      yAxis: { type: 'value', name: 'ms' },
+      dataZoom: baseZoom(),
+      series: series.concat([buildFrameMarkerSeries(modulePayload.x)])
+    };
+  }
+
+  function buildModulePieOption() {
+    if (!window.modulePayload || !modulePayload.summary) return null;
+    return {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ms ({d}%)' },
+      series: [{
+        type: 'pie',
+        radius: ['42%', '68%'],
+        avoidLabelOverlap: true,
+        itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+        label: { formatter: '{b}\n{d}%' },
+        data: modulePayload.summary.map(function (row) {
+          return { name: row.label, value: row.averageMs, itemStyle: { color: row.color } };
+        })
+      }]
+    };
   }
 
   async function initChartElement(el) {
@@ -114,8 +520,290 @@
     var chart = echarts.init(el);
     chart.setOption(option);
     chartInstances.push(chart);
-    var resize = function () { chart.resize(); };
+
+    var xValues = null;
+    if (type === 'module') {
+      moduleChartInstance = chart;
+      xValues = modulePayload.x;
+      registerChart(chart, xValues, type);
+      bindChartFrameSelection(chart, xValues);
+      if (selectedSampleFrame == null && xValues.length) {
+        selectSampleFrame(xValues[0]);
+      }
+    } else if (window.chartPayload) {
+      var xMap = {
+        fps: chartPayload.fps.x,
+        memory: chartPayload.memory.x,
+        render: chartPayload.render.x,
+        power: chartPayload.power && chartPayload.power.x,
+        pss: chartPayload.pss && chartPayload.pss.x
+      };
+      xValues = xMap[type];
+      if (xValues && xValues.length) {
+        registerChart(chart, xValues, type);
+        bindChartFrameSelection(chart, xValues);
+      }
+    }
+
+    var resize = function () {
+      chart.resize();
+      if (selectedSampleFrame != null && xValues && xValues.length) {
+        applySelectionLine(chart, selectedSampleFrame, xValues);
+      }
+    };
     window.addEventListener('resize', resize);
+  }
+
+  async function initModulePieChart() {
+    var el = document.getElementById('modulePieChart');
+    if (!el || el.dataset.initialized === '1') return;
+    var option = buildModulePieOption();
+    if (!option) {
+      el.innerHTML = '<div class="chart-loading">暂无数据</div>';
+      return;
+    }
+    el.dataset.initialized = '1';
+    el.innerHTML = '';
+    var echarts = await loadEcharts();
+    modulePieInstance = echarts.init(el);
+    modulePieInstance.setOption(option);
+    chartInstances.push(modulePieInstance);
+    if (selectedSampleFrame != null) {
+      updateModulePieForFrame(selectedSampleFrame);
+    }
+    window.addEventListener('resize', function () { modulePieInstance.resize(); });
+    modulePieInstance.on('click', function (params) {
+      if (!params.name || !window.modulePayload) return;
+      var row = modulePayload.summary.find(function (item) { return item.label === params.name; });
+      if (row) showModuleDetail(row.key);
+    });
+  }
+
+  function removeChartsByType(type) {
+    for (var i = chartRegistry.length - 1; i >= 0; i--) {
+      if (chartRegistry[i].type === type) chartRegistry.splice(i, 1);
+    }
+  }
+
+  function disposeDetailCharts() {
+    if (moduleDetailPieInstance) {
+      try { moduleDetailPieInstance.dispose(); } catch (e) { /* ignore */ }
+      moduleDetailPieInstance = null;
+    }
+    if (moduleDetailChartInstance) {
+      try { moduleDetailChartInstance.dispose(); } catch (e) { /* ignore */ }
+      moduleDetailChartInstance = null;
+    }
+    removeChartsByType('module-detail');
+  }
+
+  function updateModuleSidebarNav(moduleKey) {
+    document.querySelectorAll('.module-nav-link, [data-module-nav]').forEach(function (link) {
+      link.classList.remove('active');
+    });
+    if (!moduleKey || moduleKey === 'overview') {
+      var overviewLink = document.querySelector('[data-module-nav="overview"]');
+      if (overviewLink) overviewLink.classList.add('active');
+      return;
+    }
+    var active = document.querySelector('[data-module-nav="' + moduleKey + '"]');
+    if (active) active.classList.add('active');
+  }
+
+  function showModuleOverview() {
+    currentModuleKey = null;
+    var overview = document.getElementById('moduleOverview');
+    var detail = document.getElementById('moduleDetail');
+    if (overview) overview.classList.remove('hidden');
+    if (detail) detail.classList.add('hidden');
+    updateModuleSidebarNav('overview');
+    if (location.hash.indexOf('module-time/') === 1) {
+      history.replaceState(null, '', '#module-time');
+    }
+  }
+
+  function renderModuleDetailTable(detail) {
+    var head = document.getElementById('moduleDetailTableHead');
+    var body = document.getElementById('moduleDetailTableBody');
+    if (!head || !body) return;
+
+    var isLogic = detail.key === 'logic' && detail.hasDrillDown;
+    head.innerHTML = isLogic
+      ? '<tr><th>函数名称</th><th>CPU 耗时均值(ms)</th><th>函数占比(%)</th><th>操作</th></tr>'
+      : '<tr><th>指标</th><th>均值</th><th>占比</th><th>操作</th></tr>';
+
+    body.innerHTML = (detail.metrics || []).map(function (row) {
+      var unit = row.unit || 'ms';
+      var value = unit === 'ms'
+        ? Number(row.averageMs).toFixed(2) + ' ms'
+        : Number(row.averageMs).toFixed(0) + ' ' + unit;
+      var ratio = detail.key === 'rendering' ? '-' : Number(row.ratio).toFixed(2) + '%';
+      var op = row.linkTarget
+        ? '<a class="link-btn" href="' + row.linkTarget + '">查看详细堆栈</a>'
+        : '-';
+      return '<tr><td>' + escapeHtml(row.name) + '</td><td>' + value + '</td><td>' + ratio + '</td><td>' + op + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="muted">暂无数据</td></tr>';
+  }
+
+  async function renderModuleDetailCharts(detail) {
+    disposeDetailCharts();
+    var pieEl = document.getElementById('moduleDetailPie');
+    var chartEl = document.getElementById('moduleDetailChart');
+    if (!pieEl || !chartEl) return;
+
+    var echarts = await loadEcharts();
+
+    if (detail.pieSlices && detail.pieSlices.length) {
+      moduleDetailPieInstance = echarts.init(pieEl);
+      moduleDetailPieInstance.setOption({
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        series: [{
+          type: 'pie',
+          radius: ['42%', '68%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+          label: { formatter: '{b}\n{d}%' },
+          data: detail.pieSlices.map(function (slice) {
+            return { name: slice.name, value: slice.value, itemStyle: { color: slice.color } };
+          })
+        }]
+      });
+      chartInstances.push(moduleDetailPieInstance);
+    } else {
+      pieEl.innerHTML = '<div class="chart-loading">暂无数据</div>';
+    }
+
+    if (!detail.x || !detail.x.length || !detail.series || !detail.series.length) {
+      chartEl.innerHTML = '<div class="chart-loading">暂无趋势数据</div>';
+      return;
+    }
+
+    chartEl.innerHTML = '';
+    var isLogicStack = detail.key === 'logic' && detail.hasDrillDown;
+    var series = detail.series.map(function (item) {
+      return {
+        name: item.label,
+        type: 'line',
+        stack: isLogicStack ? 'func-stack' : undefined,
+        areaStyle: isLogicStack ? { opacity: 0.85 } : undefined,
+        showSymbol: true,
+        symbolSize: 5,
+        triggerLineEvent: true,
+        smooth: true,
+        yAxisIndex: item.yAxisIndex || 0,
+        data: item.data,
+        itemStyle: { color: item.color }
+      };
+    });
+
+    var option = {
+      tooltip: { trigger: 'axis', axisPointer: axisPointerLine() },
+      legend: { type: 'scroll', top: 0 },
+      grid: { left: 50, right: detail.dualAxis ? 50 : 20, top: 48, bottom: 50 },
+      xAxis: { type: 'category', data: detail.x, name: '帧' },
+      yAxis: detail.dualAxis
+        ? [{ type: 'value', name: 'ms' }, { type: 'value', name: '次数' }]
+        : { type: 'value', name: 'ms' },
+      dataZoom: baseZoom(),
+      series: series
+    };
+
+    moduleDetailChartInstance = echarts.init(chartEl);
+    moduleDetailChartInstance.setOption(option);
+    chartInstances.push(moduleDetailChartInstance);
+    registerChart(moduleDetailChartInstance, detail.x, 'module-detail');
+    bindChartFrameSelection(moduleDetailChartInstance, detail.x);
+    if (selectedSampleFrame != null) {
+      syncChartEntry(chartRegistry[chartRegistry.length - 1], selectedSampleFrame);
+    }
+    window.addEventListener('resize', function () {
+      if (moduleDetailChartInstance) moduleDetailChartInstance.resize();
+      if (moduleDetailPieInstance) moduleDetailPieInstance.resize();
+    });
+  }
+
+  function showModuleDetail(moduleKey) {
+    if (!window.moduleDetails || !moduleDetails[moduleKey]) return;
+    currentModuleKey = moduleKey;
+    var detail = moduleDetails[moduleKey];
+    var overview = document.getElementById('moduleOverview');
+    var detailView = document.getElementById('moduleDetail');
+    if (overview) overview.classList.add('hidden');
+    if (detailView) detailView.classList.remove('hidden');
+
+    var crumb = document.getElementById('moduleDetailCrumb');
+    if (crumb) crumb.textContent = detail.title;
+    var pieTitle = document.getElementById('moduleDetailPieTitle');
+    if (pieTitle) pieTitle.textContent = detail.pieTitle || '占比预览';
+    var chartTitle = document.getElementById('moduleDetailChartTitle');
+    if (chartTitle) chartTitle.textContent = detail.chartTitle || detail.detailTitle;
+
+    var hint = document.getElementById('moduleDetailHint');
+    if (hint) {
+      if (detail.emptyHint) {
+        hint.textContent = detail.emptyHint;
+        hint.classList.remove('hidden');
+      } else {
+        hint.classList.add('hidden');
+        hint.textContent = '';
+      }
+    }
+
+    renderModuleDetailTable(detail);
+    renderModuleDetailCharts(detail);
+    updateModuleSidebarNav(moduleKey);
+
+    var section = document.getElementById('module-time');
+    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (location.hash !== '#module-time/' + moduleKey) {
+      history.replaceState(null, '', '#module-time/' + moduleKey);
+    }
+  }
+
+  function initModuleNavigation() {
+    document.querySelectorAll('.module-row-clickable').forEach(function (row) {
+      row.style.cursor = 'pointer';
+      row.onclick = function () {
+        if (row.dataset.module) showModuleDetail(row.dataset.module);
+      };
+    });
+
+    var backLink = document.getElementById('moduleBackLink');
+    if (backLink) {
+      backLink.onclick = function (event) {
+        event.preventDefault();
+        showModuleOverview();
+      };
+    }
+
+    document.querySelectorAll('.module-nav-link').forEach(function (link) {
+      link.onclick = function (event) {
+        var moduleKey = link.getAttribute('data-module-nav');
+        if (moduleKey && moduleKey !== 'overview') {
+          event.preventDefault();
+          showModuleDetail(moduleKey);
+        }
+      };
+    });
+
+    var hashModule = parseModuleHash();
+    if (hashModule && window.moduleDetails && moduleDetails[hashModule]) {
+      showModuleDetail(hashModule);
+    } else {
+      updateModuleSidebarNav('overview');
+    }
+
+    window.addEventListener('hashchange', function () {
+      var moduleKey = parseModuleHash();
+      if (moduleKey) showModuleDetail(moduleKey);
+      else if (location.hash === '#module-time' || location.hash.indexOf('#module-time') === 0) showModuleOverview();
+    });
+  }
+
+  function parseModuleHash() {
+    var hash = (location.hash || '').replace(/^#/, '');
+    if (hash.indexOf('module-time/') !== 0) return null;
+    return hash.split('/')[1] || null;
   }
 
   function initLazyCharts() {
@@ -123,6 +811,7 @@
     if (!nodes.length) return;
     if (!('IntersectionObserver' in window)) {
       nodes.forEach(function (el) { initChartElement(el); });
+      initModulePieChart();
       return;
     }
     var observer = new IntersectionObserver(function (entries) {
@@ -134,6 +823,19 @@
       });
     }, { rootMargin: '120px' });
     nodes.forEach(function (el) { observer.observe(el); });
+
+    var pieEl = document.getElementById('modulePieChart');
+    if (pieEl) {
+      var pieObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            initModulePieChart();
+            pieObserver.unobserve(entry.target);
+          }
+        });
+      }, { rootMargin: '120px' });
+      pieObserver.observe(pieEl);
+    }
   }
 
   function initDiagnosis() {
@@ -253,9 +955,11 @@
   });
 
   document.addEventListener('DOMContentLoaded', function () {
+    initCapturePanel();
     initLazyCharts();
     initDiagnosis();
     initFuncTable();
     initLogViewer();
+    initModuleNavigation();
   });
 })();

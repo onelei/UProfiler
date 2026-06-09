@@ -35,6 +35,7 @@ public static class ReportDataLoader
         var powerList = powerInfos?.DevicePowerConsumeInfos ?? new List<DevicePowerConsumeInfoDto>();
         var pssList = memoryUse?.MemoryUsedList ?? new List<MemoryUseDataDto>();
 
+        var captureFrames = CaptureFrameService.Build(sessionKey, files);
         var context = new ReportDataContext
         {
             SessionKey = sessionKey,
@@ -49,6 +50,7 @@ public static class ReportDataLoader
             FuncAnalysis = funcAnalysis,
             LogLines = logLines,
             Files = files,
+            CaptureFrames = captureFrames,
             AvgFps = avgFps,
             MinFps = minFps,
             MaxFps = maxFps,
@@ -70,7 +72,12 @@ public static class ReportDataLoader
                 powerList)
         };
 
-        return context;
+        var moduleTime = ModuleTimeBuilder.Build(context);
+        return context with
+        {
+            ModuleTime = moduleTime,
+            ModuleDetails = ModuleDetailBuilder.Build(context with { ModuleTime = moduleTime })
+        };
     }
 
     static T? ReadJson<T>(IReadOnlyList<SessionUpload> files, string prefix) where T : class

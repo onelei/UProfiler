@@ -9,13 +9,17 @@ namespace LemonFramework.UProfiler.Core
 {
     public static class HookUtil
     {
-        static Thread mainThread = Thread.CurrentThread;
-        static Dictionary<string, FuncData> FunctionDatas = new Dictionary<string, FuncData>();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        static readonly Thread MainThread = Thread.CurrentThread;
+        static readonly Dictionary<string, FuncData> FunctionDatas = new Dictionary<string, FuncData>();
 
         public static void Begin(string methodName)
         {
+            if (!UProfilerSettings.IsFunctionHookEnabled)
+                return;
+
             // Only sample on the Unity main thread.
-            if (Thread.CurrentThread == mainThread)
+            if (Thread.CurrentThread == MainThread)
             {
                 long tmpMemory = Profiler.GetTotalAllocatedMemoryLong();
                 float tmpTime = Time.realtimeSinceStartup;
@@ -28,15 +32,17 @@ namespace LemonFramework.UProfiler.Core
                 }
                 else
                 {
-                    var tmp = new FuncData();
-                    tmp.FuncName = methodName;
-                    tmp.FuncMemory = 0L;
-                    tmp.FuncTime = 0f;
-                    tmp.FuncCalls = 0;
-                    tmp.FuncTotalMemory = 0L;
-                    tmp.FuncTotalTime = 0f;
-                    tmp.BeginMemory = tmpMemory;
-                    tmp.BeginTime = tmpTime;
+                    var tmp = new FuncData
+                    {
+                        FuncName = methodName,
+                        FuncMemory = 0L,
+                        FuncTime = 0f,
+                        FuncCalls = 0,
+                        FuncTotalMemory = 0L,
+                        FuncTotalTime = 0f,
+                        BeginMemory = tmpMemory,
+                        BeginTime = tmpTime
+                    };
                     FunctionDatas.Add(methodName, tmp);
                 }
             }
@@ -44,8 +50,14 @@ namespace LemonFramework.UProfiler.Core
 
         public static void End(string methodName)
         {
-            if (Thread.CurrentThread == mainThread)
+            if (!UProfilerSettings.IsFunctionHookEnabled)
+                return;
+
+            if (Thread.CurrentThread == MainThread)
             {
+                if (!FunctionDatas.ContainsKey(methodName))
+                    return;
+
                 long tmpMem = Profiler.GetTotalAllocatedMemoryLong();
                 float tmpTime = Time.realtimeSinceStartup;
                 FuncData tmp = FunctionDatas[methodName];
@@ -66,31 +78,37 @@ namespace LemonFramework.UProfiler.Core
 
         public static void MethodAnalysisReport(string testTime = "")
         {
+            if (!UProfilerSettings.IsFunctionHookEnabled)
+            {
+                Debug.LogWarning("[UProfiler] Function Hook is disabled. Enable it in UProfiler > Settings.");
+                return;
+            }
+
             if (FunctionDatas.Count <= 0)
             {
                 Debug.Log("IL inject succeeded; no samples collected yet.");
                 return;
             }
-            string fileCSVName = "";
+            string fileCsvName = "";
             string fileTxtName = "";
             if (string.IsNullOrEmpty(testTime))
             {
-                fileCSVName = System.DateTime.Now.ToString("[yyyy-MM-dd]-[HH-mm-ss]");
+                fileCsvName = System.DateTime.Now.ToString("[yyyy-MM-dd]-[HH-mm-ss]");
             }
             else
             {
-                fileCSVName = ConstString.funcAnalysisPrefix + testTime;
+                fileCsvName = ConstString.funcAnalysisPrefix + testTime;
                 fileTxtName = ConstString.funcAnalysisPrefix + testTime + ConstString.textExt;
                 fileTxtName = Path.Combine(Application.persistentDataPath, fileTxtName);
             }
-            fileCSVName += ".csv";
-            fileCSVName = Path.Combine(Application.persistentDataPath, fileCSVName);
+            fileCsvName += ".csv";
+            fileCsvName = Path.Combine(Application.persistentDataPath, fileCsvName);
 
             string header = "FuncName,FuncMemory/k,FuncAverageMemory/k,FuncUseTime/s,FuncAverageTime/ms,FuncCalls";
-            using (StreamWriter sw = new StreamWriter(fileCSVName))
+            using (StreamWriter sw = new StreamWriter(fileCsvName))
             {
                 sw.WriteLine(header);
-                var ge = FunctionDatas.GetEnumerator();
+                using var ge = FunctionDatas.GetEnumerator();
                 while (ge.MoveNext())
                 {
                     var tmp = ge.Current.Value;
@@ -106,12 +124,12 @@ namespace LemonFramework.UProfiler.Core
                 }
                 sw.Close();
             }
-            Debug.Log($"Function performance CSV written: {fileCSVName}");
+            Debug.Log($"Function performance CSV written: {fileCsvName}");
 
             if (!string.IsNullOrEmpty(fileTxtName))
             {
                 List<FuncAnalysisInfo> funcAnalysisInfos = new List<FuncAnalysisInfo>();
-                var ge = FunctionDatas.GetEnumerator();
+                using var ge = FunctionDatas.GetEnumerator();
                 while (ge.MoveNext())
                 {
                     var tmp = ge.Current.Value;
@@ -148,23 +166,40 @@ namespace LemonFramework.UProfiler.Core
 
         public static void BeginDebugLog(string methodName)
         {
+            if (!UProfilerSettings.IsFunctionHookEnabled)
+                return;
+
             Debug.Log($"---Hook BeginDebugLog:{methodName}");
         }
 
         public static void EndDebugLog(string methodName)
         {
+            if (!UProfilerSettings.IsFunctionHookEnabled)
+                return;
+
             Debug.Log($"---Hook EndDebugLog:{methodName}");
         }
 
         public static void PrintMethodDatas()
         {
+            if (!UProfilerSettings.IsFunctionHookEnabled)
+            {
+                Debug.LogWarning("[UProfiler] Function Hook is disabled. Enable it in UProfiler > Settings.");
+                return;
+            }
+
             if (FunctionDatas.Count <= 0)
             {
-                Debug.LogWarning("Run a Hook inject menu item first, then profile and print again.");
+                Debug.LogWarning(
+                    "[UProfiler] No function timing data collected.\n" +
+                    "• UProfiler → Settings: Enable Function Hook must be ON\n" +
+                    "• Enter Play mode (auto-injects [FunctionAnalysis] before Play)\n" +
+                    "• Or manually: Hook → Inject [FunctionAnalysis] Methods, then Play\n" +
+                    "• ProfilerSample inject does NOT fill this list; [FunctionAnalysis] methods must run first");
                 return;
             }
             Debug.Log("------------ Method timing summary -----------------");
-            var ge = FunctionDatas.GetEnumerator();
+            using var ge = FunctionDatas.GetEnumerator();
             while (ge.MoveNext())
             {
                 var tmp = ge.Current.Value;
@@ -179,5 +214,15 @@ namespace LemonFramework.UProfiler.Core
                 Debug.Log(sb.ToString());
             }
         }
+#else
+        public static void Begin(string methodName) { }
+        public static void End(string methodName) { }
+        public static void MethodAnalysisReport(string testTime = "") { }
+        public static void BeginSample(string methodName) { }
+        public static void EndSample() { }
+        public static void BeginDebugLog(string methodName) { }
+        public static void EndDebugLog(string methodName) { }
+        public static void PrintMethodDatas() { }
+#endif
     }
 }

@@ -23,6 +23,8 @@ public static class ReportHtmlBuilder
     public static string Build(ReportDataContext data)
     {
         var chartPayload = BuildChartPayload(data);
+        var modulePayload = BuildModulePayload(data);
+        var capturePayload = BuildCapturePayload(data);
         var diagnosisJson = JsonSerializer.Serialize(data.DiagnosisItems, JsonCamelCase);
         var funcJson = BuildFuncJson(data);
         var logJson = JsonSerializer.Serialize(data.LogLines, JsonSafeHtml);
@@ -44,7 +46,7 @@ public static class ReportHtmlBuilder
             PortalHtmlBuilder.NavTab.Report,
             string.IsNullOrWhiteSpace(packageName) ? null : packageName));
         sb.Append("<div class=\"layout\">");
-        sb.Append(BuildSidebar());
+        sb.Append(BuildSidebar(data));
         sb.Append("<main class=\"main\">");
         sb.Append(BuildHeader(data, productName));
         sb.Append(BuildSummaryCards(data));
@@ -63,6 +65,8 @@ public static class ReportHtmlBuilder
             sb.Append(BuildChartCard("pssChart", "pss", "PSS 内存"));
         }
         sb.Append("</div></section>");
+
+        sb.Append(BuildModuleTimeSection(data));
 
         sb.Append("""
 <section id="diagnosis" class="section"><div class="section-title">性能诊断</div>
@@ -91,6 +95,10 @@ public static class ReportHtmlBuilder
         sb.Append("</main></div>");
 
         sb.Append("<script>window.chartPayload=").Append(chartPayload).Append(";</script>");
+        sb.Append("<script>window.modulePayload=").Append(modulePayload).Append(";</script>");
+        sb.Append("<script>window.moduleDetails=").Append(BuildModuleDetailsPayload(data)).Append(";</script>");
+        sb.Append("<script>window.capturePayload=").Append(capturePayload).Append(";</script>");
+        sb.Append("<script>window.reportSession=").Append(JsonSerializer.Serialize(data.SessionKey, JsonSafeHtml)).Append(";</script>");
         sb.Append("<script>window.diagnosisItems=").Append(diagnosisJson).Append(";</script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("report.js")).Append("\"></script>");
         sb.Append("</body></html>");
@@ -201,6 +209,120 @@ public static class ReportHtmlBuilder
         return JsonSerializer.Serialize(payload, JsonCamelCase);
     }
 
+    static string BuildModulePayload(ReportDataContext data)
+    {
+        return JsonSerializer.Serialize(data.ModuleTime, JsonCamelCase);
+    }
+
+    static string BuildCapturePayload(ReportDataContext data)
+    {
+        var payload = new
+        {
+            sessionKey = data.SessionKey,
+            productName = data.TestInfo?.ProductName ?? "",
+            platform = data.TestInfo?.Platform ?? "",
+            version = data.TestInfo?.Version ?? "",
+            deviceModel = data.DeviceInfo?.DeviceModel ?? "",
+            frames = data.CaptureFrames.FrameImages.Keys.OrderBy(item => item).ToArray(),
+            hasCaptures = data.CaptureFrames.FrameImages.Count > 0
+        };
+        return JsonSerializer.Serialize(payload, JsonCamelCase);
+    }
+
+    static string BuildModuleTimeSection(ReportDataContext data)
+    {
+        if (data.ModuleTime.X.Count == 0)
+        {
+            return """
+<section id="module-time" class="section"><div class="section-title">模块耗时统计</div>
+<p class="muted">暂无帧率采样数据，无法生成模块耗时统计。</p></section>
+""";
+        }
+
+        var summaryRows = new StringBuilder();
+        foreach (var row in data.ModuleTime.Summary)
+        {
+            var valueClass = row.OverRecommend ? "module-over" : "";
+            summaryRows.Append("<tr class=\"module-row-clickable\" data-module=\"")
+                .Append(WebUtility.HtmlEncode(row.Key))
+                .Append("\"><td><span class=\"module-dot\" style=\"background:")
+                .Append(row.Color)
+                .Append("\"></span>")
+                .Append(WebUtility.HtmlEncode(row.Label))
+                .Append("</td><td")
+                .Append(string.IsNullOrEmpty(valueClass) ? "" : " class=\"" + valueClass + "\"")
+                .Append(">")
+                .Append(row.AverageMs.ToString("F2", CultureInfo.InvariantCulture))
+                .Append(" ms</td><td>")
+                .Append(row.RecommendMs.ToString("F1", CultureInfo.InvariantCulture))
+                .Append(" ms</td></tr>");
+        }
+
+        return $"""
+<section id="module-time" class="section">
+<div class="section-title">模块耗时统计</div>
+<p class="muted module-note">点击饼图或表格行进入模块详情；点击图表采样点可在左侧查看对应截图。</p>
+<div class="module-layout">
+<div id="capturePanel" class="capture-panel hidden">
+  <div class="capture-head"><span id="captureScene">-</span><button id="captureExpand" type="button" title="放大">⤢</button></div>
+  <div class="capture-body"><img id="captureImage" alt="采样截图" /><div id="capturePlaceholder" class="capture-placeholder">暂无截图</div></div>
+  <div class="capture-nav">
+    <button id="capturePrev" type="button" class="capture-nav-btn" title="上一采样" aria-label="上一采样">‹</button>
+    <span id="captureNavInfo">- / -</span>
+    <button id="captureNext" type="button" class="capture-nav-btn" title="下一采样" aria-label="下一采样">›</button>
+  </div>
+  <div class="capture-foot"><span id="captureFrameLabel">第 - 帧</span><span id="captureDevice">-</span></div>
+</div>
+<div class="module-main">
+  <div id="moduleOverview" class="module-view">
+  <div class="module-summary">
+    <div class="module-summary-card">
+      <div class="chart-head">模块占比预览</div>
+      <div id="modulePieChart" class="chart module-pie"></div>
+    </div>
+    <div class="module-summary-card">
+      <div class="chart-head">模块均值与推荐值</div>
+      <table class="module-table"><thead><tr><th>模块分类</th><th>CPU 耗时均值</th><th>推荐值</th></tr></thead>
+      <tbody>{summaryRows}</tbody></table>
+    </div>
+  </div>
+  <div class="chart-card module-chart-card">
+    <div class="chart-head">各模块 CPU 耗时</div>
+    <div id="moduleTimeChart" class="chart module-time-chart" data-chart="module"></div>
+  </div>
+  </div>
+  <div id="moduleDetail" class="module-view hidden">
+    <nav class="module-breadcrumb">
+      <a href="#module-time" id="moduleBackLink">各模块 CPU 耗时</a>
+      <span class="module-breadcrumb-sep">/</span>
+      <span id="moduleDetailCrumb">模块详情</span>
+    </nav>
+    <p id="moduleDetailHint" class="muted module-detail-hint hidden"></p>
+    <div class="module-detail-summary">
+      <div class="module-summary-card">
+        <div class="chart-head" id="moduleDetailPieTitle">函数占比预览</div>
+        <div id="moduleDetailPie" class="chart module-pie"></div>
+      </div>
+      <div class="module-summary-card module-detail-table-wrap">
+        <div class="chart-head" id="moduleDetailTableTitle">指标列表</div>
+        <table class="module-table module-detail-table">
+          <thead id="moduleDetailTableHead"><tr><th>名称</th><th>均值</th><th>占比</th><th>操作</th></tr></thead>
+          <tbody id="moduleDetailTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="chart-card module-chart-card">
+      <div class="chart-head" id="moduleDetailChartTitle">模块 CPU 耗时</div>
+      <div id="moduleDetailChart" class="chart module-time-chart"></div>
+    </div>
+  </div>
+</div>
+</div>
+</section>
+<div id="captureModal" class="capture-modal hidden"><div class="capture-modal-inner"><button id="captureModalClose" type="button">×</button><img id="captureModalImage" alt="采样截图" /></div></div>
+""";
+    }
+
     static void DownsamplePair(ref int[] x, ref int[] y, out int original, out int shown)
     {
         original = x.Length;
@@ -296,21 +418,43 @@ public static class ReportHtmlBuilder
         return JsonSerializer.Serialize(rows, JsonSafeHtml);
     }
 
-    static string BuildSidebar()
+    static string BuildModuleDetailsPayload(ReportDataContext data)
     {
-        return """
+        return JsonSerializer.Serialize(data.ModuleDetails, JsonCamelCase);
+    }
+
+    static string BuildSidebar(ReportDataContext data)
+    {
+        var sb = new StringBuilder();
+        sb.Append("""
 <aside class="sidebar">
   <div class="brand">UProfiler</div>
   <nav>
     <a href="#overview">性能总结</a>
     <a href="#trend">总体性能趋势</a>
+    <a class="sidebar-sub" href="#module-time" data-module-nav="overview">模块耗时统计</a>
+""");
+
+        foreach (var module in data.ModuleTime.Modules)
+        {
+            sb.Append("<a class=\"sidebar-sub module-nav-link\" href=\"#module-time/")
+                .Append(WebUtility.HtmlEncode(module.Key))
+                .Append("\" data-module-nav=\"")
+                .Append(WebUtility.HtmlEncode(module.Key))
+                .Append("\">")
+                .Append(WebUtility.HtmlEncode(module.Label))
+                .Append("模块</a>");
+        }
+
+        sb.Append("""
     <a href="#diagnosis">性能诊断</a>
     <a href="#info">基础与设备信息</a>
     <a href="#func">函数性能</a>
     <a href="#log">运行日志</a>
   </nav>
 </aside>
-""";
+""");
+        return sb.ToString();
     }
 
     static string BuildHeader(ReportDataContext data, string productName)

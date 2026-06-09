@@ -32,7 +32,6 @@ namespace LemonFramework.UProfiler.Samples
         {
             Debug.LogFormat("Normal Max: {0}", Normal.GetMax(6, 9));
             Debug.LogFormat("Inject Max: {0}", Inject.GetMax(6, 9));
-            //for (int i = 0; i < 3; i++)
             Test();
             for (int i = 0; i < 3; i++)
                 TestDefine();
@@ -41,31 +40,7 @@ namespace LemonFramework.UProfiler.Samples
             {
                 btn_ShowFuncAnalysicClick.onClick.AddListener(() =>
                 {
-                    //#if ENABLE_ANALYSIS
                     HookUtil.PrintMethodDatas();
-
-                    //var datas = HookUtil.GetFunctionMonitorFileDatas();
-                    //if (datas != null && datas.Count > 0)
-                    //{
-                    //    Debug.Log("--------������к�������������?------");
-                    //    foreach (var data in datas)
-                    //    {
-                    //        Debug.Log(data);
-                    //    }
-
-                    //    var datasJsonStr = JsonUtility.ToJson();
-                    //    Debug.Log(datasJsonStr);
-                    //    MonitorLib.Core.Tools.EmailSend(datasJsonStr);
-                    //    var funcAnalysisFile = FileManager.WriteToFile($"{Application.persistentDataPath}/a.txt", datasJsonStr);
-                    //    if (funcAnalysisFile)
-                    //    {
-                    //        //UploadFile(funcAnalysisFilePath);
-                    //    }
-                    //}
-                    //else
-                    //{
-                    //    Debug.Log("--------û�к������ܼ������?--------");
-                    //}
                 });
             }
         }
@@ -74,27 +49,26 @@ namespace LemonFramework.UProfiler.Samples
         [ProfilerSample]
         public void Test()
         {
-            Debug.Log("��ʼѭ��100��");
+            Debug.Log("开始循环100次");
             for (int i = 0; i < 100; i++)
             {
                 Debug.Log(i);
             }
-            Debug.Log("����ѭ��100��");
+            Debug.Log("完成循环100次");
         }
-        //[ProfilerSampleWithDefineName("-------�Զ���Sample����,��ʱ��û֧��")]
+
         [FunctionAnalysis]
         [ProfilerSample]
         public void TestDefine()
         {
             Profiler.BeginSample("*************");
-            Debug.Log("���������Եķ���");
+            Debug.Log("测试自定义的方法");
             Profiler.EndSample();
         }
 
-        [HideAnalysis] //����Ҫ�����ĺ���
+        [HideAnalysis] //不需要分析的后函数
         private void OnGUI()
         {
-
         }
     }
 }

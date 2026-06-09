@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.FileProviders;
 
 var requestedPort = ResolvePort(args);
-var port = FindAvailablePort(requestedPort);
 var baseDir = AppContext.BaseDirectory;
 var uploadDir = Path.Combine(baseDir, "uploads");
 var logDir = Path.Combine(baseDir, "logs");
@@ -17,6 +16,14 @@ var reportDir = Path.Combine(baseDir, "reports");
 Directory.CreateDirectory(uploadDir);
 Directory.CreateDirectory(logDir);
 Directory.CreateDirectory(reportDir);
+
+if (TryGenerateReportOnly(args, uploadDir, reportDir, out var generatedReportPath))
+{
+    Console.WriteLine($"Generated report: {generatedReportPath}");
+    return;
+}
+
+var port = FindAvailablePort(requestedPort);
 
 var serverState = new ServerState();
 var uploadIndex = new UploadIndex(uploadDir);
@@ -93,6 +100,12 @@ app.MapMethods("/{**path}", new[] { "GET", "POST", "PUT", "OPTIONS" }, async (Ht
         if (TryServeStaticFile(path, staticWebRoot, out var staticFileResult))
         {
             return staticFileResult;
+        }
+
+        if (path.StartsWith("/capture/", StringComparison.OrdinalIgnoreCase)
+            && path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryServeCaptureImage(path, uploadIndex);
         }
 
         await SafeLogRequestAsync(serverState, context, path, form);
@@ -200,6 +213,69 @@ Console.WriteLine($"Log dir:     {logDir}");
 Console.WriteLine("Press Ctrl+C to stop.");
 
 app.Run();
+
+static bool TryGenerateReportOnly(string[] args, string uploadDir, string reportDir, out string reportPath)
+{
+    reportPath = "";
+    if (args.Length < 2 || !args[0].Equals("--generate-report", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    var dataRoot = ResolveDataRoot(AppContext.BaseDirectory);
+    uploadDir = Path.Combine(dataRoot, "uploads");
+    reportDir = Path.Combine(dataRoot, "reports");
+    Directory.CreateDirectory(reportDir);
+
+    var sessionKey = args[1];
+    var packageName = args.Length > 2 ? args[2] : null;
+    var uploadIndex = new UploadIndex(uploadDir);
+    var reportGenerator = new ReportGenerator(uploadIndex, reportDir);
+    reportPath = reportGenerator.Generate(sessionKey, packageName);
+    return true;
+}
+
+static string ResolveDataRoot(string baseDir)
+{
+    var candidates = new[]
+    {
+        Path.GetFullPath(Path.Combine(baseDir, "..", "..", "Release", "net8.0")),
+        Path.GetFullPath(Path.Combine(baseDir, "..", "Release", "net8.0")),
+        Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "bin", "Release", "net8.0")),
+        baseDir
+    };
+
+    return candidates
+        .Where(dir => Directory.Exists(Path.Combine(dir, "uploads")))
+        .OrderByDescending(dir => Directory.GetDirectories(Path.Combine(dir, "uploads")).Length)
+        .FirstOrDefault() ?? baseDir;
+}
+
+static IResult TryServeCaptureImage(string path, UploadIndex uploadIndex)
+{
+    // /capture/{sessionKey}/{frameIndex}.png
+    var parts = path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+    if (parts.Length != 3
+        || !parts[0].Equals("capture", StringComparison.OrdinalIgnoreCase)
+        || !parts[2].EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.NotFound();
+    }
+
+    var sessionKey = parts[1];
+    var frameToken = Path.GetFileNameWithoutExtension(parts[2]);
+    if (!int.TryParse(frameToken, out var frameIndex))
+    {
+        return Results.NotFound();
+    }
+
+    if (!CaptureFrameService.TryResolveImagePath(sessionKey, frameIndex, uploadIndex, out var imagePath))
+    {
+        return Results.NotFound();
+    }
+
+    return Results.File(imagePath, "image/png");
+}
 
 static bool TryServeStaticFile(string path, string webRoot, out IResult result)
 {

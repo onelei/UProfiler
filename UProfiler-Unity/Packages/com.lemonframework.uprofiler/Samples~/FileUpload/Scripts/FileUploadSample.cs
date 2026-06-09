@@ -13,7 +13,7 @@ using UnityEngine.UI;
 //        var uploadManager = gameObject.AddComponent<FileUploadManager>();
 //        uploadManager.UploadFiles(Config.PostFileHeaders, new System.Collections.Generic.Dictionary<string, string>() { { "testcase_name", "testaladdin1" } }, "folder", new System.Collections.Generic.List<string>() { { "D:/captureFrame_2022_5_1_23_10_50.zip" } }, (res, errorInfo) =>
 //        {
-//            Debug.Log($"������:{res}  error:{errorInfo}");
+//            Debug.Log($"文件上传结果:{res}  error:{errorInfo}");
 //        });
 //    }
 //}
@@ -42,7 +42,7 @@ public class FileUploadSample : MonoBehaviour
     //    return File.ReadAllBytes(filePath);
     //}
 
-    //��ȡ�ļ�תbyte[]
+    //获取文件转byte[]
     public byte[] GetStreamBytes(string path)
     {
         try
@@ -56,11 +56,11 @@ public class FileUploadSample : MonoBehaviour
         }
         catch (Exception ex)
         {
-            Debug.LogError("����" + ex.Message);
+            Debug.LogError("读取异常" + ex.Message);
         }
         return null;
     }
-    //�ļ��ϴ�
+    //文件上传
     public IEnumerator UploadResult(string URL, WWWForm wWWForm)
     {
         using (UnityWebRequest webRequest = UnityWebRequest.Post(URL, wWWForm))
@@ -74,13 +74,13 @@ public class FileUploadSample : MonoBehaviour
 
             if (webRequest.result == UnityWebRequest.Result.Success)
             {
-                Debug.LogError("�ϴ��ɹ�");
-                //text.text = "�ϴ��ɹ�";
+                Debug.LogError("上传成功");
+                //text.text = "上传成功";
             }
             else
             {
-                Debug.LogError("�ϴ�ʧ��:" + " error:" + webRequest.error + " result:" + webRequest.result.ToString());
-                //text.text = "�ϴ�ʧ��:" + " error:" + webRequest.error + " result:" + webRequest.result.ToString();
+                Debug.LogError("上传失败:" + " error:" + webRequest.error + " result:" + webRequest.result.ToString());
+                //text.text = "上传失败:" + " error:" + webRequest.error + " result:" + webRequest.result.ToString();
             }
         }
     }

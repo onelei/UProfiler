@@ -8,7 +8,9 @@ namespace LemonFramework.UProfiler.Components
     {
         private AndroidJavaClass jc;
         private AndroidJavaObject jo;
-        private bool isInit = false;
+#if UNITY_ANDROID
+        private bool isInit;
+#endif
 
         public UnityAndroidProxy()
         {
@@ -18,21 +20,22 @@ namespace LemonFramework.UProfiler.Components
         public void Init()
         {
 #if UNITY_ANDROID
-        if (isInit)
-        {
-            return;
-        }
-        try
-        {
-            jc = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
-            //jc = new AndroidJavaClass("com.sc.testextendlibrary.MainActivity");
-            jo = jc.GetStatic<AndroidJavaObject>("currentActivity");
-            isInit = true;
-        }
-        catch (Exception e)
-        {
-            Debug.LogError(e);
-        }
+            if (isInit)
+            {
+                return;
+            }
+
+            try
+            {
+                jc = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+                //jc = new AndroidJavaClass("com.sc.testextendlibrary.MainActivity");
+                jo = jc.GetStatic<AndroidJavaObject>("currentActivity");
+                isInit = true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(e);
+            }
 #endif
         }
 

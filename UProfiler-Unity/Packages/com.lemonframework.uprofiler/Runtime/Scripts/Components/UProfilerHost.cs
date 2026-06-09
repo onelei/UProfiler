@@ -12,59 +12,63 @@ namespace LemonFramework.UProfiler.Components
 {
     public class UProfilerHost : MonoBehaviour
     {
-        [Header("Enable log capture")] public bool EnableLog = false;
-        [Header("Capture frame screenshots")] public bool EnableFrameTexture = false;
+        [Header("Enable log capture")] public bool enableLog = false;
+        [Header("Capture frame screenshots")] public bool enableFrameTexture = false;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         [Header("Function analysis (requires IL inject via Hook menu)")]
-        public bool EnableFunctionAnalysis = false;
+        public bool enableFunctionAnalysis = false;
+#endif
 
         [Header("Mobile power / battery stats (Android)")]
-        public bool EnableMobileConsumptionInfo = true;
+        public bool enableMobileConsumptionInfo = true;
 
         [Header("Resource memory distribution")]
-        public bool EnableResMemoryDistributionInfo = true;
+        public bool enableResMemoryDistributionInfo = true;
 #if UNITY_2020_1_OR_NEWER
         [Header("Render stats (DrawCall, triangles)")]
-        public bool EnableRenderInfo = true;
+        public bool enableRenderInfo = true;
 #endif
         [Header("Sample interval (frames)")] [Range(10, 1000)]
-        public int IntervalFrame = 100;
+        public int intervalFrame = 100;
 
-        [Header("Frames to skip after start")] public int IgnoreFrameCount = 5;
+        [Header("Frames to skip after start")] public int ignoreFrameCount = 5;
 
         [Header("Use binary file format (.data instead of .txt)")]
-        public bool UseBinary = false;
+        public bool useBinary = false;
 
         public Text UploadTips;
         public Text ReportUrl;
-        int m_FPS = 0;
-        int m_TickTime = 0;
-        string m_StartTime = "";
-        float m_Accumulator = 0;
-        int m_Frames = 0;
-        float m_TimeLeft;
-        float m_UpdateInterval = 0.5f;
+        int _fps = 0;
+        int _tickTime = 0;
+        string _startTime = "";
+        float _accumulator = 0;
+        int _frames = 0;
+        float _timeLeft;
+        float _updateInterval = 0.5f;
         bool btnUProfiler = false;
         string btnMsg;
-        int m_frameIndex = 0;
+        int _frameIndex = 0;
         Action<bool> UProfilerCallback;
         UProfilerInfos uprofilerInfos = null;
         FrameRates frameRateInfos = null;
 #if UNITY_ANDROID && !UNITY_EDITOR
-    MemoryUseDatas memoryUseDatas = null; // Android PSS samples
-    //
-    DevicePowerConsumeInfos devicePowerConsumeInfos = null;
+        MemoryUseDatas memoryUseDatas = null; // Android PSS samples
+        DevicePowerConsumeInfos devicePowerConsumeInfos = null;
+        UnityAndroidProxy unityAndroidProxy;
 #endif
 #if UNITY_2020_1_OR_NEWER
-        RenderInfos renderInfos = null;
+        RenderInfos _renderInfos = null;
 #endif
 
         /// <summary>
         /// <summary>Per-frame resource memory samples.</summary>
-        RecordResInfos recordResInfos = null;
+        RecordResInfos _recordResInfos = null;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         //
         string funcAnalysisFilePath;
+#endif
 
         string logFilePath;
 
@@ -107,13 +111,11 @@ namespace LemonFramework.UProfiler.Components
         //private ProfilerRecorder mainThreadTimeRecord;
 #endif
 
-        private UnityAndroidProxy unityAndroidProxy = null;
-
         void Awake()
         {
             Application.targetFrameRate = 60;
 #if UNITY_2020_1_OR_NEWER
-            if (EnableRenderInfo)
+            if (enableRenderInfo)
             {
                 setPassCallRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "SetPass Calls Count");
                 drawCallRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
@@ -128,59 +130,61 @@ namespace LemonFramework.UProfiler.Components
         {
             if (res)
             {
-                fileExt = UseBinary ? ConstString.binaryExt : ConstString.textExt;
+                fileExt = useBinary ? ConstString.binaryExt : ConstString.textExt;
                 Debug.Log(ConstString.uProfilerActive);
-                m_frameIndex = 0;
+                _frameIndex = 0;
                 ShareDatas.StartTime = DateTime.Now; //
-                m_StartTime = ShareDatas.StartTime.ToString("yyyy_MM_dd_HH_mm_ss");
-                ShareDatas.StartTimeStr = m_StartTime;
+                _startTime = ShareDatas.StartTime.ToString("yyyy_MM_dd_HH_mm_ss");
+                ShareDatas.StartTimeStr = _startTime;
 #if UNITY_EDITOR
-                PlayerPrefs.SetString("TestTime", m_StartTime);
+                PlayerPrefs.SetString("TestTime", _startTime);
                 PlayerPrefs.Save();
 #endif
-                if (EnableFrameTexture)
+                if (enableFrameTexture)
                 {
-                    captureFilePath = $"{Application.persistentDataPath}/{ConstString.captureFramePrefix}{m_StartTime}";
+                    captureFilePath = $"{Application.persistentDataPath}/{ConstString.captureFramePrefix}{_startTime}";
                     FileManager.CreateDir(captureFilePath);
                 }
 
-                if (EnableFunctionAnalysis)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (enableFunctionAnalysis && UProfilerSettings.IsFunctionHookEnabled)
                     funcAnalysisFilePath =
-                        $"{Application.persistentDataPath}/{ConstString.funcAnalysisPrefix}{m_StartTime}{fileExt}";
-                if (EnableLog)
-                    logFilePath = $"{Application.persistentDataPath}/{ConstString.logPrefix}{m_StartTime}{fileExt}";
-                deviceFilePath = $"{Application.persistentDataPath}/{ConstString.devicePrefix}{m_StartTime}{fileExt}";
-                testFilePath = $"{Application.persistentDataPath}/{ConstString.testPrefix}{m_StartTime}{fileExt}";
+                        $"{Application.persistentDataPath}/{ConstString.funcAnalysisPrefix}{_startTime}{fileExt}";
+#endif
+                if (enableLog)
+                    logFilePath = $"{Application.persistentDataPath}/{ConstString.logPrefix}{_startTime}{fileExt}";
+                deviceFilePath = $"{Application.persistentDataPath}/{ConstString.devicePrefix}{_startTime}{fileExt}";
+                testFilePath = $"{Application.persistentDataPath}/{ConstString.testPrefix}{_startTime}{fileExt}";
                 uprofilerFilePath =
-                    $"{Application.persistentDataPath}/{ConstString.uProfilerPrefix}{m_StartTime}{fileExt}";
+                    $"{Application.persistentDataPath}/{ConstString.uProfilerPrefix}{_startTime}{fileExt}";
                 frameRateFilePath =
-                    $"{Application.persistentDataPath}/{ConstString.frameRatefix}{m_StartTime}{fileExt}";
+                    $"{Application.persistentDataPath}/{ConstString.frameRatefix}{_startTime}{fileExt}";
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (EnableMobileConsumptionInfo)
                 powerConsumeFilePath =
  $"{Application.persistentDataPath}/{ConstString.PowerConsumePrefix}{m_StartTime}{fileExt}";
 #endif
-                if (EnableResMemoryDistributionInfo)
+                if (enableResMemoryDistributionInfo)
                 {
                     resMemoryDistributionPath =
-                        $"{Application.persistentDataPath}/{ConstString.resMemoryDistributionPrefix}{m_StartTime}{fileExt}";
+                        $"{Application.persistentDataPath}/{ConstString.resMemoryDistributionPrefix}{_startTime}{fileExt}";
 #if UNITY_ANDROID && !UNITY_EDITOR
                 pssMemoryUsedFilePath =
  $"{Application.persistentDataPath}/{ConstString.PssMemoryPrefix}{m_StartTime}{fileExt}";
 #endif
                 }
 #if UNITY_2020_1_OR_NEWER
-                if (EnableRenderInfo)
+                if (enableRenderInfo)
                     renderFilePath =
-                        $"{Application.persistentDataPath}/{ConstString.renderPrefix}{m_StartTime}{fileExt}";
+                        $"{Application.persistentDataPath}/{ConstString.renderPrefix}{_startTime}{fileExt}";
 #endif
-                if (EnableLog)
+                if (enableLog)
                 {
                     LogManager.CreateLogFile(logFilePath, System.IO.FileMode.Append);
                     Application.logMessageReceived += LogManager.LogToFile;
                 }
 
-                m_TickTime = 0;
+                _tickTime = 0;
                 InvokeRepeating("Tick", 1.0f, 1.0f);
 
                 if (ReportUrl != null)
@@ -200,18 +204,20 @@ namespace LemonFramework.UProfiler.Components
                 GetSystemInfo();
 
                 CancelInvoke("Tick");
-                m_TickTime = 0;
+                _tickTime = 0;
 
                 UProfilerInfosReport();
                 FrameRateInfosReport();
 #if UNITY_2020_1_OR_NEWER
-                if (EnableRenderInfo)
+                if (enableRenderInfo)
                     RenderInfosReport();
 #endif
-                if (EnableResMemoryDistributionInfo)
+                if (enableResMemoryDistributionInfo)
                     ResMemoryReport();
-                if (EnableFunctionAnalysis)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (enableFunctionAnalysis && UProfilerSettings.IsFunctionHookEnabled)
                     FuncAnalysisReport();
+#endif
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (EnableMobileConsumptionInfo) //
             {
@@ -219,21 +225,21 @@ namespace LemonFramework.UProfiler.Components
                 MobilePssMemoryUseReport();
             }
 #endif
-                if (EnableFrameTexture)
+                if (enableFrameTexture)
                     ZipCaptureFiles();
 
-                if (EnableLog)
+                if (enableLog)
                 {
                     Application.logMessageReceived -= LogManager.LogToFile;
                     LogManager.CloseLogFile();
                 }
 
-                if (EnableLog)
+                if (enableLog)
                 {
                     UploadFile(logFilePath);
                 }
 
-                HttpGet(string.Format(Config.ReportRecordUpdateRequestUrl, Application.identifier, m_StartTime),
+                HttpGet(string.Format(Config.ReportRecordUpdateRequestUrl, Application.identifier, _startTime),
                     (result) =>
                     {
                         if (result)
@@ -284,11 +290,11 @@ namespace LemonFramework.UProfiler.Components
                 platform = Application.platform.ToString(),
                 version = Application.version,
                 testTime = ShareDatas.GetTestTime(),
-                intervalFrame = this.IntervalFrame
+                intervalFrame = this.intervalFrame
             };
             // Legacy HTML test info export removed; JSON/binary via FileManager.WriteToFile above.
             bool writeRes = false;
-            if (!UseBinary)
+            if (!useBinary)
             {
                 writeRes = FileManager.WriteToFile(testFilePath, JsonUtility.ToJson(testInfo));
             }
@@ -305,12 +311,12 @@ namespace LemonFramework.UProfiler.Components
         {
             uprofilerInfos = new UProfilerInfos();
             frameRateInfos = new FrameRates();
-            renderInfos = new RenderInfos();
+            _renderInfos = new RenderInfos();
 #if UNITY_ANDROID && !UNITY_EDITOR
         devicePowerConsumeInfos = new DevicePowerConsumeInfos();
         memoryUseDatas = new MemoryUseDatas();
 #endif
-            recordResInfos = new RecordResInfos();
+            _recordResInfos = new RecordResInfos();
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -349,9 +355,10 @@ namespace LemonFramework.UProfiler.Components
     }
 #endif
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         void FuncAnalysisReport()
         {
-            HookUtil.MethodAnalysisReport(m_StartTime);
+            HookUtil.MethodAnalysisReport(_startTime);
             if (File.Exists(funcAnalysisFilePath))
             {
                 UploadFile(funcAnalysisFilePath);
@@ -361,17 +368,18 @@ namespace LemonFramework.UProfiler.Components
                 Debug.LogError($"Function analysis file missing: {funcAnalysisFilePath}");
             }
         }
+#endif
 
         void ResMemoryReport()
         {
             bool writeRes = false;
-            if (!UseBinary)
+            if (!useBinary)
             {
-                writeRes = FileManager.WriteToFile(resMemoryDistributionPath, JsonUtility.ToJson(recordResInfos));
+                writeRes = FileManager.WriteToFile(resMemoryDistributionPath, JsonUtility.ToJson(_recordResInfos));
             }
             else
             {
-                writeRes = FileManager.WriteBinaryDataToFile(resMemoryDistributionPath, recordResInfos);
+                writeRes = FileManager.WriteBinaryDataToFile(resMemoryDistributionPath, _recordResInfos);
             }
 
             if (writeRes)
@@ -384,13 +392,13 @@ namespace LemonFramework.UProfiler.Components
         void RenderInfosReport()
         {
             bool writeRes = false;
-            if (!UseBinary)
+            if (!useBinary)
             {
-                writeRes = FileManager.WriteToFile(renderFilePath, JsonUtility.ToJson(renderInfos));
+                writeRes = FileManager.WriteToFile(renderFilePath, JsonUtility.ToJson(_renderInfos));
             }
             else
             {
-                writeRes = FileManager.WriteBinaryDataToFile(renderFilePath, renderInfos);
+                writeRes = FileManager.WriteBinaryDataToFile(renderFilePath, _renderInfos);
             }
 
             if (writeRes)
@@ -403,7 +411,7 @@ namespace LemonFramework.UProfiler.Components
         void FrameRateInfosReport()
         {
             bool writeRes = false;
-            if (!UseBinary)
+            if (!useBinary)
             {
                 writeRes = FileManager.WriteToFile(frameRateFilePath, JsonUtility.ToJson(frameRateInfos));
             }
@@ -425,7 +433,7 @@ namespace LemonFramework.UProfiler.Components
             //    uprofilerInfos.UProfilerInfoList.RemoveAt(uprofilerInfos.UProfilerInfoList.Count - 1);
             //}
             bool writeRes = false;
-            if (!UseBinary)
+            if (!useBinary)
             {
                 writeRes = FileManager.WriteToFile(uprofilerFilePath, JsonUtility.ToJson(uprofilerInfos));
             }
@@ -442,7 +450,7 @@ namespace LemonFramework.UProfiler.Components
 
         void Tick()
         {
-            m_TickTime++;
+            _tickTime++;
         }
 
         void UploadFile(string filePath)
@@ -503,43 +511,45 @@ namespace LemonFramework.UProfiler.Components
             {
                 btnUProfiler = !btnUProfiler;
                 btnMsg = btnUProfiler ? ConstString.uProfilerActive : ConstString.uProfilerBegin;
-                if (UProfilerCallback != null)
-                    UProfilerCallback.Invoke(btnUProfiler);
+                UProfilerCallback?.Invoke(btnUProfiler);
             }
 
             if (btnUProfiler)
-                btnMsg = $"{ConstString.uProfilerActive}{m_TickTime}s";
-            GUI.Label(new Rect(Screen.width / 2, 0, 100, 100), "FPS:" + m_FPS);
+                btnMsg = $"{ConstString.uProfilerActive}{_tickTime}s";
+            GUI.Label(new Rect(Screen.width / 2, 0, 100, 100), "FPS:" + _fps);
         }
 
         [HideAnalysis]
         void Update()
         {
-            m_Frames++;
-            m_Accumulator += Time.unscaledDeltaTime;
-            m_TimeLeft -= Time.unscaledDeltaTime;
-            if (m_TimeLeft <= 0f)
+            _frames++;
+            _accumulator += Time.unscaledDeltaTime;
+            _timeLeft -= Time.unscaledDeltaTime;
+            if (_timeLeft <= 0f)
             {
-                m_FPS = (int) (m_Accumulator > 0f ? m_Frames / m_Accumulator : 0f);
-                m_Frames = 0;
-                m_Accumulator = 0f;
-                m_TimeLeft += m_UpdateInterval;
+                _fps = (int) (_accumulator > 0f ? _frames / _accumulator : 0f);
+                _frames = 0;
+                _accumulator = 0f;
+                _timeLeft += _updateInterval;
             }
 
             if (btnUProfiler)
             {
-                ++m_frameIndex;
-                if (m_frameIndex > IgnoreFrameCount)
+                ++_frameIndex;
+                if (_frameIndex > ignoreFrameCount)
                 {
-                    var relativeIndex = m_frameIndex - IgnoreFrameCount;
+                    var relativeIndex = _frameIndex - ignoreFrameCount;
                     frameRateInfos.frameRateList.Add(new UProfilerFrameInfo()
-                        {frameIndex = relativeIndex, frame = m_FPS});
-                    if ((m_frameIndex - IgnoreFrameCount) % IntervalFrame == 0)
+                    {
+                        frameIndex = relativeIndex,
+                        frame = _fps
+                    });
+                    if ((_frameIndex - ignoreFrameCount) % intervalFrame == 0)
                     {
                         var uprofilerInfo = new UProfilerInfo()
                         {
                             frameIndex = relativeIndex, batteryLevel = SystemInfo.batteryLevel,
-                            memorySize = Profiler.maxUsedMemory, frame = m_FPS,
+                            memorySize = Profiler.maxUsedMemory, frame = _fps,
                             monoHeapSize = Profiler.GetMonoHeapSizeLong(),
                             monoUsedSize = Profiler.GetMonoUsedSizeLong(),
                             totalAllocatedMemory = Profiler.GetTotalAllocatedMemoryLong(),
@@ -558,12 +568,12 @@ namespace LemonFramework.UProfiler.Components
                         GetFramePssMemory(relativeIndex);
                     }
 #endif
-                        if (EnableResMemoryDistributionInfo)
+                        if (enableResMemoryDistributionInfo)
                             GetResMemoryInfo(relativeIndex);
-                        if (EnableFrameTexture) // TODO: async capture
-                            ScreenCapture.CaptureScreenshot($"{captureFilePath}/img_{m_StartTime}_{relativeIndex}.png");
+                        if (enableFrameTexture) // TODO: async capture
+                            ScreenCapture.CaptureScreenshot($"{captureFilePath}/img_{_startTime}_{relativeIndex}.png");
 #if UNITY_2020_1_OR_NEWER
-                        if (EnableRenderInfo)
+                        if (enableRenderInfo)
                             GetRenderInfo(relativeIndex);
 #endif
                     }
@@ -594,7 +604,7 @@ namespace LemonFramework.UProfiler.Components
                 screenWidth = Screen.width
             };
             bool writeRes = false;
-            if (!UseBinary)
+            if (!useBinary)
             {
                 writeRes = FileManager.WriteToFile(deviceFilePath, JsonUtility.ToJson(deviceInfo));
             }
@@ -620,7 +630,7 @@ namespace LemonFramework.UProfiler.Components
                 triangles = trianglesRecord.LastValue,
                 vertices = verticesRecord.LastValue
             };
-            renderInfos.renderInfoList.Add(renderInfo);
+            _renderInfos.renderInfoList.Add(renderInfo);
         }
 #endif
 
@@ -678,7 +688,7 @@ namespace LemonFramework.UProfiler.Components
             record.totalSize += pair.Key;
             record.scriptableObjectCount = pair.Value;
             record.totalCount += pair.Value;
-            recordResInfos.recordResInfosList.Add(record);
+            _recordResInfos.recordResInfosList.Add(record);
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -726,7 +736,7 @@ namespace LemonFramework.UProfiler.Components
 
         void OnDisable()
         {
-            if (EnableRenderInfo)
+            if (enableRenderInfo)
             {
                 setPassCallRecord.Dispose();
                 drawCallRecord.Dispose();
