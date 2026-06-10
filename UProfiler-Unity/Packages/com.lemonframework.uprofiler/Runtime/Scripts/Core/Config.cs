@@ -59,5 +59,6 @@ namespace LemonFramework.UProfiler.Core
         // 渲染信息
         public const string renderPrefix = "renderInfo_";
         public const string pssMemoryPrefix = "pssMemoryInfo_";
+        public const string sceneInfoPrefix = "sceneInfo_";
     }
 }

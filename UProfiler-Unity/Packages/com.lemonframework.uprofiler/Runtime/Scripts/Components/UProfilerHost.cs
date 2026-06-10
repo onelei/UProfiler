@@ -1,11 +1,13 @@
 using LemonFramework.UProfiler.Core;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.Profiling;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace LemonFramework.UProfiler.Components
@@ -95,6 +97,10 @@ namespace LemonFramework.UProfiler.Components
         //
         string renderFilePath;
 #endif
+        string sceneInfoFilePath;
+        SceneInfoData _sceneInfoData = new SceneInfoData();
+        string _activeSceneName = "";
+        int _activeSceneStartFrame = 1;
         //
         string fileExt;
 
@@ -178,6 +184,9 @@ namespace LemonFramework.UProfiler.Components
                     renderFilePath =
                         $"{Application.persistentDataPath}/{ConstString.renderPrefix}{_startTime}{fileExt}";
 #endif
+                sceneInfoFilePath =
+                    $"{Application.persistentDataPath}/{ConstString.sceneInfoPrefix}{_startTime}{fileExt}";
+                BeginSceneTracking();
                 if (enableLog)
                 {
                     LogManager.CreateLogFile(logFilePath, System.IO.FileMode.Append);
@@ -208,6 +217,7 @@ namespace LemonFramework.UProfiler.Components
 
                 UProfilerInfosReport();
                 FrameRateInfosReport();
+                SceneInfoReport();
 #if UNITY_2020_1_OR_NEWER
                 if (enableRenderInfo)
                     RenderInfosReport();
@@ -261,6 +271,60 @@ namespace LemonFramework.UProfiler.Components
             btnMsg = ConstString.uProfilerBegin;
             GameObject.DontDestroyOnLoad(gameObject);
             UProfilerCallback += UProfilerCallBackFunc;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        void OnDestroy()
+        {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            UProfilerCallback -= UProfilerCallBackFunc;
+        }
+
+        void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (!btnUProfiler || _frameIndex <= ignoreFrameCount)
+            {
+                return;
+            }
+
+            CommitSceneSegment(_frameIndex - ignoreFrameCount);
+            _activeSceneName = scene.name;
+            _activeSceneStartFrame = _frameIndex - ignoreFrameCount;
+        }
+
+        void BeginSceneTracking()
+        {
+            _sceneInfoData = new SceneInfoData();
+            _activeSceneName = SceneManager.GetActiveScene().name;
+            _activeSceneStartFrame = 1;
+        }
+
+        void CommitSceneSegment(int endFrame)
+        {
+            if (string.IsNullOrEmpty(_activeSceneName) || endFrame < _activeSceneStartFrame)
+            {
+                return;
+            }
+
+            _sceneInfoData.segments.Add(new SceneSegmentData
+            {
+                sceneName = _activeSceneName,
+                startFrame = _activeSceneStartFrame,
+                endFrame = endFrame,
+                note = ""
+            });
+        }
+
+        void FinishSceneTracking()
+        {
+            if (string.IsNullOrEmpty(_activeSceneName))
+            {
+                return;
+            }
+
+            var endFrame = Math.Max(_activeSceneStartFrame, _frameIndex - ignoreFrameCount);
+            CommitSceneSegment(endFrame);
+            _activeSceneName = "";
         }
 
         [FunctionAnalysis]
@@ -407,6 +471,21 @@ namespace LemonFramework.UProfiler.Components
             }
         }
 #endif
+
+        void SceneInfoReport()
+        {
+            FinishSceneTracking();
+            if (_sceneInfoData.segments.Count == 0)
+            {
+                return;
+            }
+
+            var writeRes = FileManager.WriteToFile(sceneInfoFilePath, JsonUtility.ToJson(_sceneInfoData));
+            if (writeRes)
+            {
+                UploadFile(sceneInfoFilePath);
+            }
+        }
 
         void FrameRateInfosReport()
         {
@@ -727,11 +806,6 @@ namespace LemonFramework.UProfiler.Components
             {
                 Debug.LogError("Failed to zip capture folder!");
             }
-        }
-
-        private void OnDestroy()
-        {
-            UProfilerCallback -= UProfilerCallBackFunc;
         }
 
         void OnDisable()

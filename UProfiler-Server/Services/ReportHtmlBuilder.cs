@@ -63,7 +63,8 @@ public static class ReportHtmlBuilder
         sb.Append(ReportSectionsBuilder.BuildMemorySections(data));
         sb.Append(ReportSectionsBuilder.BuildBatterySection(data));
         sb.Append(ReportSectionsBuilder.BuildTemperatureSection(data));
-        sb.Append(ReportSectionsBuilder.BuildCustomSections());
+        sb.Append(ReportSectionsBuilder.BuildCustomSections(data));
+        sb.Append(ModulePerfSectionBuilder.BuildAll(data));
         sb.Append(ReportSectionsBuilder.BuildResourceManagementSections(data));
         sb.Append(BuildFuncSection(data, funcJson));
         sb.Append(ReportSectionsBuilder.BuildLogSection(data, logJson));
@@ -85,6 +86,10 @@ public static class ReportHtmlBuilder
         sb.Append("<script>window.diagnosisItems=").Append(diagnosisJson).Append(";</script>");
         sb.Append("<script>window.scenePayload=").Append(JsonSerializer.Serialize(data.SceneManagement, JsonCamelCase)).Append(";</script>");
         sb.Append("<script>window.briefPayload=").Append(JsonSerializer.Serialize(data.Brief, JsonCamelCase)).Append(";</script>");
+        sb.Append("<script>window.threadStackPayload=").Append(JsonSerializer.Serialize(data.ThreadStack, JsonCamelCase)).Append(";</script>");
+        sb.Append("<script>window.gpuBandwidthPayload=").Append(JsonSerializer.Serialize(data.GpuBandwidth, JsonCamelCase)).Append(";</script>");
+        sb.Append("<script>window.luaMemoryPayload=").Append(JsonSerializer.Serialize(data.LuaMemory, JsonCamelCase)).Append(";</script>");
+        sb.Append("<script>window.customDashboardPayload=").Append(JsonSerializer.Serialize(data.CustomDashboard, JsonCamelCase)).Append(";</script>");
         sb.Append("<script>window.resourceSummary=").Append(JsonSerializer.Serialize(data.ResourceSummary, JsonCamelCase)).Append(";</script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("report.js")).Append("\"></script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("account.js")).Append("\"></script>");

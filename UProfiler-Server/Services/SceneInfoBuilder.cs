@@ -37,8 +37,13 @@ public static class SceneInfoBuilder
             ];
         }
 
-        var rows = segments.Select(segment => BuildSceneRow(segment, data, frameTimes)).ToList();
-        var overview = BuildOverviewBars(segments, data);
+        var hasSceneInfo = data.SceneInfo?.Segments.Count > 0;
+        var filteredSegments = hasSceneInfo
+            ? segments.Where(segment => segment.EndFrame - segment.StartFrame + 1 >= 100).ToList()
+            : segments;
+
+        var rows = filteredSegments.Select(segment => BuildSceneRow(segment, data, frameTimes)).ToList();
+        var overview = BuildOverviewBars(filteredSegments, data);
 
         return new SceneManagementPayload
         {

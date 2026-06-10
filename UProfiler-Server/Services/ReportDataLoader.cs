@@ -23,6 +23,16 @@ public static class ReportDataLoader
         var powerInfos = ReadJson<DevicePowerConsumeInfosDto>(files, "powerConsume");
         var resourceMemory = ReadJson<RecordResInfosDto>(files, "resMemoryDistribution");
         var sceneInfo = ReadJson<SceneInfoDto>(files, "sceneInfo");
+        var threadStackRaw = ReadJson<ThreadStackPayload>(files, "threadStack");
+        var briefAiDiagnosis = ReadJson<BriefAiDiagnosisDto>(files, "briefAiDiagnosis");
+        var gpuBandwidth = ReadJson<GpuBandwidthDto>(files, "gpuBandwidth");
+        var luaMemory = ReadJson<LuaMemoryDto>(files, "luaMemory");
+        var resourceManagement = ReadJson<ResourceManagementDto>(files, "resourceManagement");
+        var customDashboard = ReadJson<CustomDashboardDto>(files, "customDashboard");
+        var customFuncs = ReadJson<CustomFuncsDto>(files, "apiFuncs");
+        var customVars = ReadJson<CustomVarsDto>(files, "apiInfo");
+        var customCode = ReadJson<CustomCodeDto>(files, "apiCodeFrame");
+        var moduleFuncStacks = ReadModuleFuncStacks(files);
         var funcAnalysis = ReadJsonList<FuncAnalysisInfoDto>(files, "funcAnalysis")
             .OrderByDescending(item => item.AverageTime)
             .ToList();
@@ -52,6 +62,16 @@ public static class ReportDataLoader
             PowerInfos = powerInfos,
             ResourceMemory = resourceMemory,
             SceneInfo = sceneInfo,
+            ThreadStack = threadStackRaw ?? new ThreadStackPayload(),
+            BriefAiDiagnosis = briefAiDiagnosis,
+            GpuBandwidth = gpuBandwidth,
+            LuaMemory = luaMemory,
+            ResourceManagement = resourceManagement,
+            ModuleFuncStacks = moduleFuncStacks,
+            CustomDashboard = customDashboard,
+            CustomFuncs = customFuncs,
+            CustomVars = customVars,
+            CustomCode = customCode,
             FuncAnalysis = funcAnalysis,
             LogLines = logLines,
             Files = files,
@@ -83,14 +103,57 @@ public static class ReportDataLoader
             ModuleTime = moduleTime,
             ModuleDetails = ModuleDetailBuilder.Build(context with { ModuleTime = moduleTime }),
             Jank = JankAnalyzer.Build(context),
-            ResourceSummary = BuildResourceSummary(resourceMemory)
+            ResourceSummary = BuildResourceSummary(resourceMemory),
+            JankFuncCategories = JankAnalyzer.BuildCategories(context)
         };
 
-        return enriched with
+        var withScene = enriched with
         {
             Brief = ReportBriefBuilder.Build(enriched, enriched.Jank),
             SceneManagement = SceneInfoBuilder.Build(enriched)
         };
+
+        var withThread = withScene with
+        {
+            ThreadStack = ThreadStackBuilder.Build(withScene)
+        };
+
+        var collapseMetrics = BriefCollapseBuilder.Build(withThread);
+        var finalBrief = new PerformanceBriefPayload
+        {
+            FrameCount = withThread.Brief.FrameCount,
+            SummaryText = withThread.Brief.SummaryText,
+            OptimizableCount = collapseMetrics.Count(item => item.TaskCount > 0),
+            TotalMetricCount = collapseMetrics.Count,
+            Kpis = withThread.Brief.Kpis,
+            Metrics = collapseMetrics
+        };
+
+        return withThread with { Brief = finalBrief };
+    }
+
+    static Dictionary<string, ModuleFuncStackDto> ReadModuleFuncStacks(IReadOnlyList<SessionUpload> files)
+    {
+        var result = new Dictionary<string, ModuleFuncStackDto>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in files.Where(item =>
+                     item.Prefix.Equals("moduleFuncStack", StringComparison.OrdinalIgnoreCase)
+                     && item.OriginalName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                var stack = JsonSerializer.Deserialize<ModuleFuncStackDto>(File.ReadAllText(file.SavedPath), JsonOptions);
+                if (stack != null && !string.IsNullOrWhiteSpace(stack.Module))
+                {
+                    result[stack.Module] = stack;
+                }
+            }
+            catch
+            {
+                // ignore malformed uploads
+            }
+        }
+
+        return result;
     }
 
     static List<ResourceSummaryRow> BuildResourceSummary(RecordResInfosDto? resourceMemory)

@@ -497,6 +497,17 @@
         series: [{ name: '三角面', type: 'line', smooth: true, showSymbol: false, data: p.render.triangles, itemStyle: { color: '#52c41a' } }]
       };
     }
+    if (type === 'gpu-bandwidth-real' && window.gpuBandwidthPayload && gpuBandwidthPayload.samples && gpuBandwidthPayload.samples.length) {
+      var samples = gpuBandwidthPayload.samples;
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 50, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: samples.map(function (s) { return s.frameIndex; }), name: '帧' },
+        yAxis: { type: 'value', name: 'MB/s' },
+        dataZoom: baseZoom(),
+        series: [{ name: 'GPU Total Bandwidth', type: 'line', smooth: true, showSymbol: false, areaStyle: {}, data: samples.map(function (s) { return Math.round(s.totalBytes / 1024 / 1024); }), itemStyle: { color: '#1677ff' } }]
+      };
+    }
     if (type === 'gpu-bandwidth' && p.render && p.render.x) {
       var maxDc = Math.max.apply(null, p.render.drawCall) || 1;
       var maxTri = Math.max.apply(null, p.render.triangles) || 1;
@@ -1085,17 +1096,156 @@
 
   function initBriefFilter() {
     var checkbox = document.getElementById('briefOptimOnly');
-    var table = document.getElementById('briefMetricsTable');
-    if (!checkbox || !table) return;
-    checkbox.onchange = function () {
-      table.querySelectorAll('.brief-metric-row').forEach(function (row) {
+    var list = document.getElementById('briefMetricsTable');
+    if (!checkbox || !list) return;
+    function apply() {
+      list.querySelectorAll('.brief-collapse-item').forEach(function (row) {
         if (!checkbox.checked) {
           row.style.display = '';
           return;
         }
         row.style.display = row.classList.contains('optimizable') ? '' : 'none';
       });
-    };
+    }
+    checkbox.onchange = apply;
+    document.querySelectorAll('.brief-task-jump').forEach(function (btn) {
+      btn.onclick = function () {
+        checkbox.checked = true;
+        apply();
+        list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+    });
+  }
+
+  function initThreadTabs() {
+    document.querySelectorAll('.thread-tab').forEach(function (tab) {
+      tab.onclick = function () {
+        var key = tab.getAttribute('data-thread-tab');
+        document.querySelectorAll('.thread-tab').forEach(function (x) { x.classList.remove('active'); });
+        document.querySelectorAll('.thread-tab-panel').forEach(function (x) { x.classList.remove('active'); });
+        tab.classList.add('active');
+        var panel = document.querySelector('.thread-tab-panel[data-thread-panel="' + key + '"]');
+        if (panel) {
+          panel.classList.add('active');
+          initChartsInPanel(panel);
+        }
+      };
+    });
+    document.querySelectorAll('.thread-stack-export').forEach(function (btn) {
+      btn.onclick = function () {
+        var thread = btn.getAttribute('data-thread');
+        var table = document.querySelector('.thread-func-table[data-thread-func="' + thread + '"]');
+        if (!table) return;
+        var lines = ['函数名,耗时均值,总耗时,总体占比,自身耗时,自身占比,总调用次数,单次耗时,调用帧数,每帧调用次数'];
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+          var cells = row.querySelectorAll('td');
+          if (cells.length < 10) return;
+          lines.push(Array.prototype.map.call(cells, function (c) { return '"' + c.textContent.trim().replace(/"/g, '""') + '"'; }).join(','));
+        });
+        var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (thread || 'thread') + '_stack.csv';
+        a.click();
+      };
+    });
+  }
+
+  function initJankFuncTabs() {
+    document.querySelectorAll('#jankFuncTabs .jank-tab').forEach(function (tab) {
+      tab.onclick = function () {
+        if (tab.classList.contains('muted')) return;
+        var key = tab.getAttribute('data-jank-cat');
+        document.querySelectorAll('#jankFuncTabs .jank-tab').forEach(function (x) { x.classList.remove('active'); });
+        document.querySelectorAll('.jank-func-panel').forEach(function (x) { x.classList.remove('active'); });
+        tab.classList.add('active');
+        var panel = document.querySelector('.jank-func-panel[data-jank-panel="' + key + '"]');
+        if (panel) panel.classList.add('active');
+      };
+    });
+    document.querySelectorAll('.func-jump-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        location.hash = '#func';
+      };
+    });
+  }
+
+  function initTextTabs(containerId, tabClass, panelClass, attrTab, attrPanel) {
+    var root = document.getElementById(containerId);
+    if (!root) return;
+    root.querySelectorAll('.' + tabClass).forEach(function (tab) {
+      tab.onclick = function () {
+        var key = tab.getAttribute(attrTab);
+        root.querySelectorAll('.' + tabClass).forEach(function (x) { x.classList.remove('active'); });
+        document.querySelectorAll('.' + panelClass).forEach(function (x) { x.classList.remove('active'); });
+        tab.classList.add('active');
+        var panel = document.querySelector('.' + panelClass + '[' + attrPanel + '="' + key + '"]');
+        if (panel) {
+          panel.classList.add('active');
+          initChartsInPanel(panel);
+        }
+      };
+    });
+  }
+
+  function initScopeToolbar() {
+    var globalRange = { start: 0, end: null, scene: null };
+    if (window.scenePayload && scenePayload.scenes && scenePayload.scenes.length) {
+      globalRange.end = scenePayload.scenes[scenePayload.scenes.length - 1].endFrame;
+    }
+    document.querySelectorAll('.scope-frame-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        var val = window.prompt('输入帧号（留空取消）', globalRange.start || 0);
+        if (val == null || val === '') return;
+        var frame = parseInt(val, 10);
+        if (isNaN(frame)) return;
+        globalRange.start = frame;
+        globalRange.end = frame;
+        document.querySelectorAll('.scope-range-label').forEach(function (label) {
+          label.textContent = label.textContent.replace(/（.*?）/, '（' + frame + '帧）');
+        });
+        selectSampleFrame(frame);
+      };
+    });
+    document.querySelectorAll('.scope-scene-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        location.hash = '#scene-management';
+      };
+    });
+  }
+
+  function initMetricDragSort() {
+    document.querySelectorAll('[data-draggable-grid]').forEach(function (grid) {
+      var dragEl = null;
+      grid.querySelectorAll('.uwa-metric-card[draggable="true"]').forEach(function (card) {
+        card.addEventListener('dragstart', function () { dragEl = card; card.classList.add('dragging'); });
+        card.addEventListener('dragend', function () { card.classList.remove('dragging'); dragEl = null; });
+        card.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          if (!dragEl || dragEl === card) return;
+          var rect = card.getBoundingClientRect();
+          var after = (e.clientY - rect.top) / rect.height > 0.5;
+          grid.insertBefore(dragEl, after ? card.nextSibling : card);
+        });
+      });
+    });
+  }
+
+  function initFuncSearch() {
+    document.querySelectorAll('.func-search-input').forEach(function (input) {
+      input.oninput = function () {
+        var q = input.value.trim().toLowerCase();
+        var moduleKey = input.getAttribute('data-module');
+        var threadKey = input.getAttribute('data-thread');
+        var selector = moduleKey
+          ? '.module-func-table[data-module-func="' + moduleKey + '"] tbody tr'
+          : '.thread-func-table[data-thread-func="' + threadKey + '"] tbody tr';
+        document.querySelectorAll(selector).forEach(function (row) {
+          var text = row.textContent.toLowerCase();
+          row.style.display = !q || text.indexOf(q) !== -1 ? '' : 'none';
+        });
+      };
+    });
   }
 
   function initLogFilters() {
@@ -1203,6 +1353,14 @@
     'resource-ab': 'AssetBundle 加载&卸载',
     'resource-load': '资源加载&卸载',
     'resource-instantiate': '资源实例化&激活',
+    'module-particles': '粒子系统性能',
+    'module-rendering': '渲染模块性能',
+    'module-sync': 'GPU同步模块性能',
+    'module-logic': '逻辑代码模块性能',
+    'module-ui': 'UI模块性能',
+    'module-loading': '加载模块性能',
+    'module-physics': '物理系统性能',
+    'module-animation': '动画模块性能',
     func: '函数性能分析',
     log: '运行日志'
   };
@@ -1211,6 +1369,7 @@
     var hash = (location.hash || '').replace(/^#/, '');
     if (!hash) return 'brief';
     if (hash.indexOf('module-time/') === 0) return 'module-time';
+    if (hash.indexOf('module-') === 0) return hash.split('/')[0];
     return hash.split('/')[0] || 'brief';
   }
 
@@ -1306,6 +1465,13 @@
     initFuncTable();
     initLogFilters();
     initBriefFilter();
+    initThreadTabs();
+    initJankFuncTabs();
+    initTextTabs('luaMemoryTabs', 'text-tab', 'lua-tab-panel', 'data-lua-tab', 'data-lua-panel');
+    initTextTabs('memResourceTabs', 'text-tab', 'res-tab-panel', 'data-res-tab', 'data-res-panel');
+    initScopeToolbar();
+    initMetricDragSort();
+    initFuncSearch();
     initModuleNavigation();
   });
 })();

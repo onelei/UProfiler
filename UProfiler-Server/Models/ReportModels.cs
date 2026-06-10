@@ -316,6 +316,240 @@ public sealed class BriefMetricRow
     public string Value { get; init; } = "-";
     public string Unit { get; init; } = "";
     public int TaskCount { get; init; }
+    public string IndustryRank { get; init; } = "-";
+    public string ModuleKey { get; init; } = "";
+    public List<BriefDiagnosisEntry> Diagnosis { get; init; } = new();
+}
+
+public sealed class BriefDiagnosisEntry
+{
+    public string Severity { get; init; } = "Low";
+    public List<string> Roles { get; init; } = new();
+    public string Title { get; init; } = "";
+    public string Value { get; init; } = "";
+    public string Suggestion { get; init; } = "";
+}
+
+public sealed class ThreadStackFunctionRow
+{
+    public string Name { get; init; } = "";
+    public double AvgMs { get; init; }
+    public double TotalMs { get; init; }
+    public double SelfMs { get; init; }
+    public double TotalPct { get; init; }
+    public double SelfPct { get; init; }
+    public int CallCount { get; init; }
+    public double CallsPerFrame { get; init; }
+    public int FrameCount { get; init; }
+}
+
+public sealed class ThreadStackThreadRow
+{
+    public string Name { get; init; } = "";
+    public double AvgCpuMs { get; init; }
+    public List<ThreadStackFunctionRow> Functions { get; init; } = new();
+}
+
+public sealed class ThreadStackPayload
+{
+    public List<ThreadStackThreadRow> Threads { get; init; } = new();
+}
+
+public sealed class ModuleFuncStackFunctionRow
+{
+    public string Name { get; init; } = "";
+    public double AvgMs { get; init; }
+    public double TotalMs { get; init; }
+    public double SelfMs { get; init; }
+    public double TotalPct { get; init; }
+    public double SelfPct { get; init; }
+    public int CallCount { get; init; }
+    public double CallsPerFrame { get; init; }
+    public int FrameCount { get; init; }
+}
+
+public sealed class ModuleFuncStackMetricRow
+{
+    public string Label { get; init; } = "";
+    public double AvgMs { get; init; }
+    public double PeakMs { get; init; }
+    public int PeakFrame { get; init; }
+}
+
+public sealed class ModuleFuncStackAiEntry
+{
+    public string Title { get; init; } = "";
+    public string Severity { get; init; } = "Low";
+    public string Suggestion { get; init; } = "";
+}
+
+public sealed class ModuleFuncStackDto
+{
+    public string Module { get; init; } = "";
+    public string Scope { get; init; } = "overview";
+    public string StackMode { get; init; } = "module";
+    public string Order { get; init; } = "forward";
+    public List<ModuleFuncStackMetricRow> Metrics { get; init; } = new();
+    public List<ModuleFuncStackFunctionRow> Functions { get; init; } = new();
+    public List<ModuleFuncStackAiEntry> AiDiagnosis { get; init; } = new();
+}
+
+public sealed class BriefAiDiagnosisDto
+{
+    public List<BriefAiMetricDto> Metrics { get; init; } = new();
+}
+
+public sealed class BriefAiMetricDto
+{
+    public string Name { get; init; } = "";
+    public double Value { get; init; }
+    public string Unit { get; init; } = "";
+    public string IndustryRank { get; init; } = "-";
+    public int OptimizeCount { get; init; }
+    public List<BriefDiagnosisEntry> Diagnosis { get; init; } = new();
+}
+
+public sealed class GpuBandwidthSampleDto
+{
+    public int FrameIndex { get; set; }
+    public long ReadBytes { get; set; }
+    public long WriteBytes { get; set; }
+    public long TotalBytes { get; set; }
+}
+
+public sealed class GpuBandwidthDto
+{
+    public List<GpuBandwidthSampleDto> Samples { get; set; } = new();
+}
+
+public sealed class LuaMemoryCurveDto
+{
+    public string Label { get; init; } = "";
+    public string Unit { get; init; } = "KB";
+    public List<double> Values { get; init; } = new();
+    public List<int> Frames { get; init; } = new();
+}
+
+public sealed class LuaHeapAllocationDto
+{
+    public string Type { get; init; } = "";
+    public long SizeBytes { get; init; }
+    public int Count { get; init; }
+    public string FunctionName { get; init; } = "";
+    public double AvgAlloc { get; init; }
+}
+
+public sealed class LuaMonoRefDto
+{
+    public string ObjectName { get; init; } = "";
+    public int RefCount { get; init; }
+    public int DestroyedCount { get; init; }
+}
+
+public sealed class LuaMemoryDto
+{
+    public List<string> SubTabs { get; init; } = new();
+    public List<string> HeapMetrics { get; init; } = new();
+    public List<LuaMemoryCurveDto> Curves { get; init; } = new();
+    public List<LuaHeapAllocationDto> Allocations { get; init; } = new();
+    public List<LuaMonoRefDto> MonoRefs { get; init; } = new();
+    public List<ModuleFuncStackAiEntry> AiDiagnosis { get; init; } = new();
+}
+
+public sealed class ResourceManagementEventDto
+{
+    public int Frame { get; init; }
+    public string Action { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Path { get; init; } = "";
+    public string Scene { get; init; } = "";
+    public double DurationMs { get; init; }
+}
+
+public sealed class ResourceManagementTopDto
+{
+    public string Name { get; init; } = "";
+    public string Path { get; init; } = "";
+    public string LoadMode { get; init; } = "";
+    public int Count { get; init; }
+}
+
+public sealed class ResourceManagementDto
+{
+    public double ResourcesLoadPer1k { get; init; }
+    public double AbLoadPer1k { get; init; }
+    public double InstantiatePer1k { get; init; }
+    public double ActivatePer1k { get; init; }
+    public List<ResourceManagementTopDto> AbLoadTop { get; init; } = new();
+    public List<ResourceManagementTopDto> ResourceLoadTop { get; init; } = new();
+    public List<ResourceManagementTopDto> InstantiateTop { get; init; } = new();
+    public List<ResourceManagementTopDto> UnloadTop { get; init; } = new();
+    public List<ResourceManagementEventDto> AssetBundle { get; init; } = new();
+    public List<ResourceManagementEventDto> Resource { get; init; } = new();
+    public List<ResourceManagementEventDto> Instantiate { get; init; } = new();
+}
+
+public sealed class CustomDashboardMetricDto
+{
+    public string Label { get; init; } = "";
+    public string Unit { get; init; } = "";
+    public List<int> Frames { get; init; } = new();
+    public List<double> Values { get; init; } = new();
+}
+
+public sealed class CustomDashboardPanelDto
+{
+    public string Name { get; init; } = "";
+    public List<CustomDashboardMetricDto> Metrics { get; init; } = new();
+}
+
+public sealed class CustomDashboardDto
+{
+    public List<CustomDashboardPanelDto> Panels { get; init; } = new();
+}
+
+public sealed class CustomFuncGroupDto
+{
+    public string GroupName { get; init; } = "";
+    public List<ModuleFuncStackFunctionRow> Functions { get; init; } = new();
+}
+
+public sealed class CustomFuncsDto
+{
+    public List<CustomFuncGroupDto> Groups { get; init; } = new();
+}
+
+public sealed class CustomVarSampleDto
+{
+    public int FrameIndex { get; init; }
+    public string VarName { get; init; } = "";
+    public string Value { get; init; } = "";
+}
+
+public sealed class CustomVarsDto
+{
+    public List<string> VarNames { get; init; } = new();
+    public List<CustomVarSampleDto> Samples { get; init; } = new();
+}
+
+public sealed class CustomCodeSegmentDto
+{
+    public string Name { get; init; } = "";
+    public int StartFrame { get; init; }
+    public int EndFrame { get; init; }
+    public double TotalMs { get; init; }
+}
+
+public sealed class CustomCodeDto
+{
+    public List<CustomCodeSegmentDto> Segments { get; init; } = new();
+}
+
+public sealed class JankFuncCategoryPayload
+{
+    public string Key { get; init; } = "";
+    public string Label { get; init; } = "";
+    public List<JankHotFunctionRow> Functions { get; init; } = new();
 }
 
 public sealed class PerformanceBriefPayload
@@ -401,6 +635,17 @@ public sealed record ReportDataContext
     public PerformanceBriefPayload Brief { get; init; } = new();
     public JankAnalysisPayload Jank { get; init; } = new();
     public List<ResourceSummaryRow> ResourceSummary { get; init; } = new();
+    public ThreadStackPayload ThreadStack { get; init; } = new();
+    public BriefAiDiagnosisDto? BriefAiDiagnosis { get; init; }
+    public GpuBandwidthDto? GpuBandwidth { get; init; }
+    public LuaMemoryDto? LuaMemory { get; init; }
+    public ResourceManagementDto? ResourceManagement { get; init; }
+    public Dictionary<string, ModuleFuncStackDto> ModuleFuncStacks { get; init; } = new();
+    public CustomDashboardDto? CustomDashboard { get; init; }
+    public CustomFuncsDto? CustomFuncs { get; init; }
+    public CustomVarsDto? CustomVars { get; init; }
+    public CustomCodeDto? CustomCode { get; init; }
+    public List<JankFuncCategoryPayload> JankFuncCategories { get; init; } = new();
 
     public double AvgFps { get; init; }
     public int MinFps { get; init; }

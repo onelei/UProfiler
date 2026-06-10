@@ -134,7 +134,7 @@ public static class ReportSidebarBuilder
                 continue;
             }
 
-            AppendLink(sb, "#module-time/" + hash, label, badge, sub: true, moduleNav: hash);
+            AppendLink(sb, "#module-" + hash, label, badge, sub: true);
         }
     }
 

@@ -75,6 +75,48 @@ public static class JankAnalyzer
         };
     }
 
+    public static List<JankFuncCategoryPayload> BuildCategories(ReportDataContext data)
+    {
+        var jank = data.Jank;
+        var funcs = data.FuncAnalysis;
+        var totalMs = funcs.Sum(item => Math.Max(0, item.UseTime * 1000));
+        if (totalMs <= 0)
+        {
+            totalMs = 1;
+        }
+
+        List<JankHotFunctionRow> MapCategory(Func<FuncAnalysisInfoDto, bool> predicate)
+        {
+            return funcs
+                .Where(predicate)
+                .OrderByDescending(item => item.UseTime)
+                .Take(20)
+                .Select(item =>
+                {
+                    var total = item.UseTime * 1000;
+                    return new JankHotFunctionRow
+                    {
+                        Name = item.Name,
+                        KeyJankCount = item.AverageTime >= 15 ? Math.Min(jank.JankCount, 8) : 1,
+                        TotalRatio = Math.Round(total / totalMs * 100, 2),
+                        SelfRatio = Math.Round(item.AverageTime / Math.Max(1, item.AverageTime + total) * 100, 2),
+                        TotalMs = Math.Round(total, 3),
+                        SelfMs = Math.Round(item.AverageTime, 3),
+                        SpreadJankCount = jank.JankCount
+                    };
+                })
+                .ToList();
+        }
+
+        return
+        [
+            new JankFuncCategoryPayload { Key = "gc", Label = "GC.Collect卡顿点", Functions = MapCategory(item => item.Name.Contains("GC", StringComparison.OrdinalIgnoreCase)) },
+            new JankFuncCategoryPayload { Key = "loading", Label = "加载卡顿点", Functions = MapCategory(item => item.Name.Contains("Load", StringComparison.OrdinalIgnoreCase) || item.Name.Contains("Instantiate", StringComparison.OrdinalIgnoreCase)) },
+            new JankFuncCategoryPayload { Key = "animation", Label = "动画卡顿点", Functions = MapCategory(item => item.Name.Contains("Animator", StringComparison.OrdinalIgnoreCase) || item.Name.Contains("Animation", StringComparison.OrdinalIgnoreCase)) },
+            new JankFuncCategoryPayload { Key = "physics", Label = "物理卡顿点", Functions = MapCategory(item => item.Name.Contains("Physics", StringComparison.OrdinalIgnoreCase) || item.Name.Contains("Rigidbody", StringComparison.OrdinalIgnoreCase)) }
+        ];
+    }
+
     static List<JankHotFunctionRow> BuildJankHotFunctions(
         List<FuncAnalysisInfoDto> funcAnalysis,
         int jankCount)
