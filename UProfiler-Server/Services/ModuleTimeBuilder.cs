@@ -22,7 +22,7 @@ public static class ModuleTimeBuilder
     {
         var fpsList = data.FrameRates?.FrameRateList ?? new List<UProfilerFrameInfoDto>();
         var renderList = data.RenderInfos?.RenderInfoList ?? new List<RenderInfoDto>();
-        var monitorList = data.UProfilerInfos?.UProfilerInfoList ?? new List<UProfilerInfoDto>();
+        var monitorList = data.UProfilerInfos?.GetAll() ?? new List<UProfilerInfoDto>();
 
         if (fpsList.Count == 0)
         {

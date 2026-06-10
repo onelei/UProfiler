@@ -287,6 +287,7 @@
     renderCaptureImage(frameIndex);
     syncAllCharts(frameIndex);
     updateModulePieForFrame(frameIndex);
+    updateSceneFrameHint(frameIndex);
   }
 
   function navigateSample(delta) {
@@ -401,6 +402,26 @@
         series: [{ name: 'FPS', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.fps.y, itemStyle: { color: '#1677ff' } }]
       };
     }
+    if (type === 'frametime' && p.frametime && p.frametime.x) {
+      var markArea = buildSceneMarkAreas();
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 50, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.frametime.x, name: '帧' },
+        yAxis: { type: 'value', name: 'ms' },
+        dataZoom: baseZoom(),
+        series: [{
+          name: '每帧耗时',
+          type: 'line',
+          smooth: true,
+          showSymbol: false,
+          triggerLineEvent: true,
+          data: p.frametime.y,
+          itemStyle: { color: '#fa8c16' },
+          markArea: markArea
+        }]
+      };
+    }
     if (type === 'memory') {
       return {
         tooltip: tooltipBase,
@@ -456,6 +477,130 @@
         series: [{ name: 'PSS', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, areaStyle: {}, data: p.pss.y, itemStyle: { color: '#1677ff' } }]
       };
     }
+    if (type === 'render-dc' && p.render && p.render.x) {
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 50, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.render.x, name: '帧' },
+        yAxis: { type: 'value', name: 'DrawCall' },
+        dataZoom: baseZoom(),
+        series: [{ name: 'DrawCall', type: 'line', smooth: true, showSymbol: false, data: p.render.drawCall, itemStyle: { color: '#1677ff' } }]
+      };
+    }
+    if (type === 'render-tri' && p.render && p.render.x) {
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 50, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.render.x, name: '帧' },
+        yAxis: { type: 'value', name: '三角面' },
+        dataZoom: baseZoom(),
+        series: [{ name: '三角面', type: 'line', smooth: true, showSymbol: false, data: p.render.triangles, itemStyle: { color: '#52c41a' } }]
+      };
+    }
+    if (type === 'gpu-bandwidth' && p.render && p.render.x) {
+      var maxDc = Math.max.apply(null, p.render.drawCall) || 1;
+      var maxTri = Math.max.apply(null, p.render.triangles) || 1;
+      var pressure = p.render.drawCall.map(function (dc, i) {
+        return Math.round((dc / maxDc) * (p.render.triangles[i] / maxTri) * 100);
+      });
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 50, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.render.x, name: '帧' },
+        yAxis: { type: 'value', name: '压力指数' },
+        dataZoom: baseZoom(),
+        series: [{ name: '渲染压力', type: 'line', smooth: true, showSymbol: false, areaStyle: {}, data: pressure, itemStyle: { color: '#fa8c16' } }]
+      };
+    }
+    if (type === 'memory-mono' && p.memory && p.memory.x) {
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 50, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.memory.x, name: '帧' },
+        yAxis: { type: 'value', name: 'MB' },
+        dataZoom: baseZoom(),
+        series: [{ name: 'MonoUsed', type: 'line', smooth: true, showSymbol: false, data: p.memory.monoUsed, itemStyle: { color: '#722ed1' } }]
+      };
+    }
+    if (type === 'temperature' && p.power && p.power.x) {
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 50, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.power.x, name: '帧' },
+        yAxis: { type: 'value', name: '℃' },
+        dataZoom: baseZoom(),
+        series: [{ name: 'CPU温度', type: 'line', smooth: true, showSymbol: false, data: p.power.cpuTemp, itemStyle: { color: '#ff4d4f' } }]
+      };
+    }
+    if (type === 'resource-pie' && window.resourceSummary && resourceSummary.length) {
+      return {
+        tooltip: { trigger: 'item', formatter: '{b}: {c} bytes ({d}%)' },
+        series: [{
+          type: 'pie',
+          radius: ['40%', '68%'],
+          data: resourceSummary.filter(function (row) { return row.avgSizeBytes > 0; }).map(function (row) {
+            return { name: row.label || row.type, value: row.avgSizeBytes };
+          })
+        }]
+      };
+    }
+    if (type === 'resource-trend' && window.resourceSummary && resourceSummary.length) {
+      return {
+        tooltip: { trigger: 'axis' },
+        grid: { left: 50, right: 20, top: 30, bottom: 40 },
+        xAxis: { type: 'category', data: resourceSummary.map(function (row) { return row.label || row.type; }) },
+        yAxis: { type: 'value', name: 'MB' },
+        series: [{
+          name: '平均占用',
+          type: 'bar',
+          data: resourceSummary.map(function (row) { return Math.round(row.avgSizeBytes / 1024 / 1024 * 100) / 100; }),
+          itemStyle: { color: '#1677ff' }
+        }]
+      };
+    }
+    if (type === 'scene-cpu-bar' && window.scenePayload && scenePayload.overviewBars && scenePayload.overviewBars.length) {
+      var modules = scenePayload.overviewModules || ['渲染', 'UI', '加载', '动画', '粒子系统', '物理', '同步等待', '逻辑代码'];
+      var moduleKeys = ['rendering', 'ui', 'loading', 'animation', 'particles', 'physics', 'sync', 'logic'];
+      var scenes = scenePayload.overviewBars.map(function (bar) { return bar.sceneName; });
+      var series = moduleKeys.map(function (key, index) {
+        return {
+          name: modules[index] || key,
+          type: 'bar',
+          stack: 'cpu',
+          emphasis: { focus: 'series' },
+          data: scenePayload.overviewBars.map(function (bar) {
+            return bar.moduleMs && bar.moduleMs[key] != null ? bar.moduleMs[key] : 0;
+          })
+        };
+      });
+      return {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        legend: { type: 'scroll', top: 0 },
+        grid: { left: 50, right: 20, top: 48, bottom: 80 },
+        xAxis: { type: 'category', data: scenes, axisLabel: { rotate: scenes.length > 6 ? 30 : 0 } },
+        yAxis: { type: 'value', name: 'ms' },
+        series: series
+      };
+    }
+    if (type === 'thread-stack' && window.modulePayload && modulePayload.summary && modulePayload.summary.length) {
+      return {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: 120, right: 20, top: 20, bottom: 30 },
+        xAxis: { type: 'value', name: 'ms' },
+        yAxis: {
+          type: 'category',
+          data: modulePayload.summary.map(function (row) { return row.label; }).concat(['Overhead'])
+        },
+        series: [{
+          name: 'CPU耗时均值',
+          type: 'bar',
+          data: modulePayload.summary.map(function (row) { return row.averageMs; }).concat([
+            Math.max(0, modulePayload.summary.reduce(function (sum, row) { return sum + row.averageMs; }, 0) * 0.15)
+          ]),
+          itemStyle: { color: '#1677ff' }
+        }]
+      };
+    }
     if (type === 'module') {
       return buildModuleChartOption();
     }
@@ -506,6 +651,23 @@
     };
   }
 
+  function buildSceneMarkAreas() {
+    if (!window.scenePayload || !scenePayload.scenes || !scenePayload.scenes.length) return undefined;
+    var colors = ['rgba(22,119,255,0.08)', 'rgba(82,196,26,0.08)', 'rgba(250,140,22,0.08)', 'rgba(114,46,209,0.08)'];
+    return {
+      silent: true,
+      data: scenePayload.scenes.map(function (scene, index) {
+        return [{
+          name: scene.sceneName,
+          xAxis: String(scene.startFrame),
+          itemStyle: { color: colors[index % colors.length] }
+        }, {
+          xAxis: String(scene.endFrame)
+        }];
+      })
+    };
+  }
+
   async function initChartElement(el) {
     if (el.dataset.initialized === '1') return;
     var type = el.dataset.chart;
@@ -533,9 +695,15 @@
     } else if (window.chartPayload) {
       var xMap = {
         fps: chartPayload.fps.x,
+        frametime: chartPayload.frametime && chartPayload.frametime.x,
         memory: chartPayload.memory.x,
         render: chartPayload.render.x,
+        'render-dc': chartPayload.render && chartPayload.render.x,
+        'render-tri': chartPayload.render && chartPayload.render.x,
+        'gpu-bandwidth': chartPayload.render && chartPayload.render.x,
+        'memory-mono': chartPayload.memory && chartPayload.memory.x,
         power: chartPayload.power && chartPayload.power.x,
+        temperature: chartPayload.power && chartPayload.power.x,
         pss: chartPayload.pss && chartPayload.pss.x
       };
       xValues = xMap[type];
@@ -616,6 +784,7 @@
     var detail = document.getElementById('moduleDetail');
     if (overview) overview.classList.remove('hidden');
     if (detail) detail.classList.add('hidden');
+    activatePanel('module-time');
     updateModuleSidebarNav('overview');
     if (location.hash.indexOf('module-time/') === 1) {
       history.replaceState(null, '', '#module-time');
@@ -751,10 +920,8 @@
 
     renderModuleDetailTable(detail);
     renderModuleDetailCharts(detail);
+    activatePanel('module-time');
     updateModuleSidebarNav(moduleKey);
-
-    var section = document.getElementById('module-time');
-    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (location.hash !== '#module-time/' + moduleKey) {
       history.replaceState(null, '', '#module-time/' + moduleKey);
     }
@@ -916,36 +1083,90 @@
     renderPage();
   }
 
-  function initLogViewer() {
+  function initBriefFilter() {
+    var checkbox = document.getElementById('briefOptimOnly');
+    var table = document.getElementById('briefMetricsTable');
+    if (!checkbox || !table) return;
+    checkbox.onchange = function () {
+      table.querySelectorAll('.brief-metric-row').forEach(function (row) {
+        if (!checkbox.checked) {
+          row.style.display = '';
+          return;
+        }
+        row.style.display = row.classList.contains('optimizable') ? '' : 'none';
+      });
+    };
+  }
+
+  function initLogFilters() {
     var dataEl = document.getElementById('logData');
     var box = document.getElementById('logBox');
-    var moreBtn = document.getElementById('logMore');
     if (!dataEl || !box) return;
     var lines = JSON.parse(dataEl.textContent || '[]');
+    var filter = 'all';
     var chunk = 80;
     var shown = 0;
+    var filtered = lines.slice();
+
+    function classify(line) {
+      if (/\[Exception\]/i.test(line)) return 'exception';
+      if (/\[Error\]/i.test(line)) return 'error';
+      if (/\[Warning\]/i.test(line)) return 'warning';
+      if (/\[Log\]/i.test(line)) return 'log';
+      return 'log';
+    }
+
+    function applyFilter() {
+      filtered = filter === 'all' ? lines : lines.filter(function (line) { return classify(line) === filter; });
+      shown = 0;
+      box.innerHTML = '';
+      appendLines();
+    }
 
     function lineClass(line) {
-      if (/(\[Error\]|\[Exception\]|\[Assert\])/i.test(line)) return 'log-line log-error';
-      if (/\[Warning\]/i.test(line)) return 'log-line log-warning';
+      var kind = classify(line);
+      if (kind === 'error' || kind === 'exception') return 'log-line log-error';
+      if (kind === 'warning') return 'log-line log-warning';
       return 'log-line log-info';
     }
 
     function appendLines() {
-      var next = lines.slice(shown, shown + chunk);
+      var next = filtered.slice(shown, shown + chunk);
       box.insertAdjacentHTML('beforeend', next.map(function (line) {
-        return '<div class="' + lineClass(line) + '"></div>'.replace('></div>', '>' + escapeHtml(line) + '</div>');
+        return '<div class="' + lineClass(line) + '">' + escapeHtml(line) + '</div>';
       }).join(''));
       shown += next.length;
-      if (moreBtn) moreBtn.style.display = shown >= lines.length ? 'none' : 'inline-block';
+      var moreBtn = document.getElementById('logMore');
+      if (moreBtn) moreBtn.style.display = shown >= filtered.length ? 'none' : 'inline-block';
     }
 
-    function escapeHtml(text) {
-      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+    document.querySelectorAll('.log-filter-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        document.querySelectorAll('.log-filter-btn').forEach(function (x) { x.classList.remove('active'); });
+        btn.classList.add('active');
+        filter = btn.dataset.logFilter || 'all';
+        applyFilter();
+      };
+    });
 
-    appendLines();
+    var moreBtn = document.getElementById('logMore');
     if (moreBtn) moreBtn.onclick = appendLines;
+    applyFilter();
+  }
+
+  function updateSceneFrameHint(frameIndex) {
+    var hint = document.getElementById('sceneFrameHint');
+    if (!hint || !window.scenePayload || !scenePayload.scenes) return;
+    var scene = scenePayload.scenes.find(function (item) {
+      return frameIndex >= item.startFrame && frameIndex <= item.endFrame;
+    });
+    var ms = window.chartPayload && chartPayload.frametime && chartPayload.frametime.y
+      ? chartPayload.frametime.y[findNearestDataIndex(chartPayload.frametime.x, frameIndex)] : null;
+    if (scene) {
+      hint.textContent = '第' + frameIndex + '帧 ' + scene.sceneName + ' · 每帧耗时: ' + (ms != null ? ms + ' ms' : '-');
+    } else {
+      hint.textContent = ms != null ? '第' + frameIndex + '帧 · 每帧耗时: ' + ms + ' ms' : '';
+    }
   }
 
   window.addEventListener('beforeunload', function () {
@@ -954,12 +1175,137 @@
     });
   });
 
+  var panelTitles = {
+    brief: '性能简报',
+    basicinfo: '运行信息',
+    'scene-overview': '场景概览 · 性能概览',
+    'scene-management': '场景概览 · 场景管理',
+    'gpu-render': 'GPU分析 · GPU 渲染分析',
+    'gpu-bandwidth': 'GPU分析 · GPU 带宽分析',
+    'gpu-summary': 'GPU分析 · 指标汇总',
+    trend: '总体性能趋势',
+    'module-time': '模块耗时统计',
+    'thread-stack': '各线程 CPU 调用堆栈',
+    diagnosis: '性能诊断',
+    'jank-frames': '卡顿分析 · 卡顿点分析',
+    'jank-func': '卡顿分析 · 重点函数分析',
+    'memory-occupy': '内存分析 · 内存占用',
+    'memory-resource': '内存分析 · 资源内存',
+    'memory-lua': '内存分析 · Lua内存',
+    'memory-mono': '内存分析 · Mono内存',
+    battery: '耗电量',
+    temperature: '温度变化量',
+    'custom-dashboard': '自定义面板',
+    'custom-funcs': '自定义函数组',
+    'custom-vars': '自定义变量',
+    'custom-code': '自定义代码段',
+    'resource-summary': '资源管理汇总',
+    'resource-ab': 'AssetBundle 加载&卸载',
+    'resource-load': '资源加载&卸载',
+    'resource-instantiate': '资源实例化&激活',
+    func: '函数性能分析',
+    log: '运行日志'
+  };
+
+  function resolvePanelFromHash() {
+    var hash = (location.hash || '').replace(/^#/, '');
+    if (!hash) return 'brief';
+    if (hash.indexOf('module-time/') === 0) return 'module-time';
+    return hash.split('/')[0] || 'brief';
+  }
+
+  function initChartsInPanel(panelEl) {
+    if (!panelEl) return;
+    var charts = panelEl.querySelectorAll('.chart[data-chart]');
+    charts.forEach(function (el) {
+      initChartElement(el);
+    });
+    setTimeout(function () {
+      chartInstances.forEach(function (chart) {
+        try { chart.resize(); } catch (e) { /* ignore */ }
+      });
+    }, 120);
+  }
+
+  function activatePanel(panelId) {
+    document.querySelectorAll('.report-panel').forEach(function (panel) {
+      panel.classList.toggle('active', panel.dataset.panel === panelId);
+    });
+    document.querySelectorAll('.sidebar-menu a').forEach(function (link) {
+      var href = (link.getAttribute('href') || '').replace(/^#/, '');
+      var linkPanel = href.indexOf('module-time/') === 0 ? 'module-time' : href.split('/')[0];
+      link.classList.toggle('active', linkPanel === panelId && !href.match(/module-time\/.+/));
+    });
+    var crumb = document.getElementById('breadcrumbPanel');
+    if (crumb) crumb.textContent = panelTitles[panelId] || panelId;
+    var activePanel = document.querySelector('.report-panel[data-panel="' + panelId + '"]');
+    initChartsInPanel(activePanel);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function initSceneManagement() {
+    document.querySelectorAll('.scene-detail-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        var row = btn.closest('.scene-row');
+        if (!row) return;
+        var start = parseInt(row.dataset.start, 10);
+        if (!isNaN(start)) selectSampleFrame(start);
+      };
+    });
+  }
+
+  function initSidebarNavigation() {
+    document.querySelectorAll('.sidebar-group-title').forEach(function (btn) {
+      btn.onclick = function () {
+        var group = btn.closest('.sidebar-group');
+        if (!group) return;
+        var expanded = btn.getAttribute('aria-expanded') !== 'false';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        group.classList.toggle('collapsed', expanded);
+      };
+    });
+
+    document.querySelectorAll('.sidebar-menu a[href^="#"]').forEach(function (link) {
+      link.onclick = function (event) {
+        event.preventDefault();
+        var href = link.getAttribute('href') || '';
+        if (location.hash !== href) {
+          location.hash = href;
+        } else {
+          var panelId = href.replace('#', '').split('/')[0];
+          if (href.indexOf('module-time/') === 0) panelId = 'module-time';
+          activatePanel(panelId);
+        }
+      };
+    });
+
+    function onHashChange() {
+      var panelId = resolvePanelFromHash();
+      activatePanel(panelId);
+      var moduleKey = parseModuleHash();
+      if (moduleKey && window.moduleDetails && moduleDetails[moduleKey]) {
+        showModuleDetail(moduleKey);
+      } else if (panelId === 'module-time') {
+        showModuleOverview();
+      }
+    }
+
+    window.addEventListener('hashchange', onHashChange);
+    if (!location.hash) {
+      location.hash = '#brief';
+    }
+    onHashChange();
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initCapturePanel();
+    initSidebarNavigation();
+    initSceneManagement();
     initLazyCharts();
     initDiagnosis();
     initFuncTable();
-    initLogViewer();
+    initLogFilters();
+    initBriefFilter();
     initModuleNavigation();
   });
 })();

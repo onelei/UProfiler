@@ -63,6 +63,12 @@ public sealed class UProfilerInfosDto
 {
     [JsonPropertyName("UProfilerInfoList")]
     public List<UProfilerInfoDto> UProfilerInfoList { get; set; } = new();
+
+    [JsonPropertyName("MonitorInfoList")]
+    public List<UProfilerInfoDto> MonitorInfoList { get; set; } = new();
+
+    public List<UProfilerInfoDto> GetAll() =>
+        UProfilerInfoList.Count > 0 ? UProfilerInfoList : MonitorInfoList;
 }
 
 public sealed class RenderInfoDto
@@ -214,6 +220,164 @@ public sealed class ModuleDetailPayload
     public bool DualAxis { get; init; }
 }
 
+public sealed class SceneSegmentDto
+{
+    public string SceneName { get; set; } = "";
+    public int StartFrame { get; set; }
+    public int EndFrame { get; set; }
+    public string? Note { get; set; }
+}
+
+public sealed class SceneInfoDto
+{
+    public List<SceneSegmentDto> Segments { get; set; } = new();
+}
+
+public sealed class FrameTimePoint
+{
+    public int FrameIndex { get; init; }
+    public double FrameMs { get; init; }
+}
+
+public sealed class SceneTableRow
+{
+    public string SceneName { get; init; } = "";
+    public int StartFrame { get; init; }
+    public int EndFrame { get; init; }
+    public int FrameCount { get; init; }
+    public double AvgFrameMs { get; init; }
+    public double AvgFps { get; init; }
+    public float PeakPssMb { get; init; }
+    public double PeakMonoMb { get; init; }
+    public double PeakCpuMs { get; init; }
+    public long PeakTriangles { get; init; }
+    public long PeakDrawCall { get; init; }
+    public string Note { get; init; } = "";
+}
+
+public sealed class SceneOverviewBarRow
+{
+    public string SceneName { get; init; } = "";
+    public Dictionary<string, double> ModuleMs { get; init; } = new();
+}
+
+public sealed class SceneManagementPayload
+{
+    public bool HasSceneInfo { get; init; }
+    public List<FrameTimePoint> FrameTimes { get; init; } = new();
+    public List<SceneTableRow> Scenes { get; init; } = new();
+    public List<SceneOverviewBarRow> OverviewBars { get; init; } = new();
+    public List<string> OverviewModules { get; init; } = new();
+}
+
+public sealed class RecordResInfoDto
+{
+    public int FrameIndex { get; set; }
+    public long TextureSize { get; set; }
+    public int TextureCount { get; set; }
+    public long MeshSize { get; set; }
+    public int MeshCount { get; set; }
+    public long MaterialSize { get; set; }
+    public int MaterialCount { get; set; }
+    public long ShaderSize { get; set; }
+    public int ShaderCount { get; set; }
+    public long AnimationClipSize { get; set; }
+    public int AnimationClipCount { get; set; }
+    public long AudioClipSize { get; set; }
+    public int AudioClipCount { get; set; }
+    public long FontSize { get; set; }
+    public int FontCount { get; set; }
+    public long TextAssetSize { get; set; }
+    public int TextAssetCount { get; set; }
+    public long ScriptableObjectSize { get; set; }
+    public int ScriptableObjectCount { get; set; }
+    public long TotalSize { get; set; }
+    public int TotalCount { get; set; }
+}
+
+public sealed class RecordResInfosDto
+{
+    [JsonPropertyName("recordResInfosList")]
+    public List<RecordResInfoDto> RecordResInfosList { get; set; } = new();
+}
+
+public sealed class BriefKpiCard
+{
+    public string Key { get; init; } = "";
+    public string Label { get; init; } = "";
+    public string Value { get; init; } = "-";
+    public string Unit { get; init; } = "";
+    public int TaskCount { get; init; }
+}
+
+public sealed class BriefMetricRow
+{
+    public string Label { get; init; } = "";
+    public string Value { get; init; } = "-";
+    public string Unit { get; init; } = "";
+    public int TaskCount { get; init; }
+}
+
+public sealed class PerformanceBriefPayload
+{
+    public int FrameCount { get; init; }
+    public string SummaryText { get; init; } = "";
+    public int OptimizableCount { get; init; }
+    public int TotalMetricCount { get; init; }
+    public List<BriefKpiCard> Kpis { get; init; } = new();
+    public List<BriefMetricRow> Metrics { get; init; } = new();
+}
+
+public sealed class JankFrameRow
+{
+    public int FrameIndex { get; init; }
+    public int Fps { get; init; }
+    public double FrameMs { get; init; }
+    public string JankType { get; init; } = "Jank";
+}
+
+public sealed class JankFunctionRow
+{
+    public string Name { get; init; } = "";
+    public double AverageMs { get; init; }
+    public int Calls { get; init; }
+    public double TotalSeconds { get; init; }
+}
+
+public sealed class JankHotFunctionRow
+{
+    public string Name { get; init; } = "";
+    public int KeyJankCount { get; init; }
+    public double TotalRatio { get; init; }
+    public double SelfRatio { get; init; }
+    public double TotalMs { get; init; }
+    public double SelfMs { get; init; }
+    public int SpreadJankCount { get; init; }
+}
+
+public sealed class JankAnalysisPayload
+{
+    public double JankPerMinute { get; init; }
+    public int JankCount { get; init; }
+    public int BigJankCount { get; init; }
+    public int SevereJankCount { get; init; }
+    public int LoadingJankCount { get; init; }
+    public int OtherJankCount { get; init; }
+    public List<JankFrameRow> Frames { get; init; } = new();
+    public List<JankFunctionRow> HotFunctions { get; init; } = new();
+    public List<JankHotFunctionRow> JankHotFunctions { get; init; } = new();
+}
+
+public sealed class ResourceSummaryRow
+{
+    public string Type { get; init; } = "";
+    public string Label { get; init; } = "";
+    public long AvgSizeBytes { get; init; }
+    public int AvgCount { get; init; }
+    public long PeakSizeBytes { get; init; }
+    public string RecommendText { get; init; } = "-";
+}
+
 public sealed record ReportDataContext
 {
     public required string SessionKey { get; init; }
@@ -225,12 +389,18 @@ public sealed record ReportDataContext
     public RenderInfosDto? RenderInfos { get; init; }
     public MemoryUseDatasDto? MemoryUseDatas { get; init; }
     public DevicePowerConsumeInfosDto? PowerInfos { get; init; }
+    public RecordResInfosDto? ResourceMemory { get; init; }
+    public SceneInfoDto? SceneInfo { get; init; }
+    public SceneManagementPayload SceneManagement { get; init; } = new();
     public List<FuncAnalysisInfoDto> FuncAnalysis { get; init; } = new();
     public List<string> LogLines { get; init; } = new();
     public IReadOnlyList<SessionUpload> Files { get; init; } = Array.Empty<SessionUpload>();
     public CaptureFrameManifest CaptureFrames { get; init; } = new();
     public ModuleTimePayload ModuleTime { get; init; } = new();
     public Dictionary<string, ModuleDetailPayload> ModuleDetails { get; init; } = new();
+    public PerformanceBriefPayload Brief { get; init; } = new();
+    public JankAnalysisPayload Jank { get; init; } = new();
+    public List<ResourceSummaryRow> ResourceSummary { get; init; } = new();
 
     public double AvgFps { get; init; }
     public int MinFps { get; init; }

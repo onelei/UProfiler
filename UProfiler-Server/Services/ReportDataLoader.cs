@@ -16,10 +16,13 @@ public static class ReportDataLoader
         var testInfo = ReadJson<TestInfoDto>(files, "test");
         var deviceInfo = ReadJson<DeviceInfoDto>(files, "device");
         var frameRates = ReadJson<FrameRatesDto>(files, "frameRate");
-        var uprofilerInfos = ReadJson<UProfilerInfosDto>(files, "uprofiler");
+        var uprofilerInfos = ReadJson<UProfilerInfosDto>(files, "uprofiler")
+            ?? ReadJson<UProfilerInfosDto>(files, "monitor");
         var renderInfos = ReadJson<RenderInfosDto>(files, "renderInfo");
         var memoryUse = ReadJson<MemoryUseDatasDto>(files, "pssMemoryInfo");
         var powerInfos = ReadJson<DevicePowerConsumeInfosDto>(files, "powerConsume");
+        var resourceMemory = ReadJson<RecordResInfosDto>(files, "resMemoryDistribution");
+        var sceneInfo = ReadJson<SceneInfoDto>(files, "sceneInfo");
         var funcAnalysis = ReadJsonList<FuncAnalysisInfoDto>(files, "funcAnalysis")
             .OrderByDescending(item => item.AverageTime)
             .ToList();
@@ -30,7 +33,7 @@ public static class ReportDataLoader
         var minFps = fpsValues.Count > 0 ? fpsValues.Min() : 0;
         var maxFps = fpsValues.Count > 0 ? fpsValues.Max() : 0;
 
-        var monitorList = uprofilerInfos?.UProfilerInfoList ?? new List<UProfilerInfoDto>();
+        var monitorList = uprofilerInfos?.GetAll() ?? new List<UProfilerInfoDto>();
         var renderList = renderInfos?.RenderInfoList ?? new List<RenderInfoDto>();
         var powerList = powerInfos?.DevicePowerConsumeInfos ?? new List<DevicePowerConsumeInfoDto>();
         var pssList = memoryUse?.MemoryUsedList ?? new List<MemoryUseDataDto>();
@@ -47,6 +50,8 @@ public static class ReportDataLoader
             RenderInfos = renderInfos,
             MemoryUseDatas = memoryUse,
             PowerInfos = powerInfos,
+            ResourceMemory = resourceMemory,
+            SceneInfo = sceneInfo,
             FuncAnalysis = funcAnalysis,
             LogLines = logLines,
             Files = files,
@@ -73,10 +78,71 @@ public static class ReportDataLoader
         };
 
         var moduleTime = ModuleTimeBuilder.Build(context);
-        return context with
+        var enriched = context with
         {
             ModuleTime = moduleTime,
-            ModuleDetails = ModuleDetailBuilder.Build(context with { ModuleTime = moduleTime })
+            ModuleDetails = ModuleDetailBuilder.Build(context with { ModuleTime = moduleTime }),
+            Jank = JankAnalyzer.Build(context),
+            ResourceSummary = BuildResourceSummary(resourceMemory)
+        };
+
+        return enriched with
+        {
+            Brief = ReportBriefBuilder.Build(enriched, enriched.Jank),
+            SceneManagement = SceneInfoBuilder.Build(enriched)
+        };
+    }
+
+    static List<ResourceSummaryRow> BuildResourceSummary(RecordResInfosDto? resourceMemory)
+    {
+        var list = resourceMemory?.RecordResInfosList ?? new List<RecordResInfoDto>();
+        if (list.Count == 0)
+        {
+            return new List<ResourceSummaryRow>();
+        }
+
+        return new List<ResourceSummaryRow>
+        {
+            BuildResRow("Texture", list, item => item.TextureSize, item => item.TextureCount),
+            BuildResRow("Mesh", list, item => item.MeshSize, item => item.MeshCount),
+            BuildResRow("Material", list, item => item.MaterialSize, item => item.MaterialCount),
+            BuildResRow("Shader", list, item => item.ShaderSize, item => item.ShaderCount),
+            BuildResRow("AnimationClip", list, item => item.AnimationClipSize, item => item.AnimationClipCount),
+            BuildResRow("AudioClip", list, item => item.AudioClipSize, item => item.AudioClipCount),
+            BuildResRow("Font", list, item => item.FontSize, item => item.FontCount),
+            BuildResRow("TextAsset", list, item => item.TextAssetSize, item => item.TextAssetCount),
+            BuildResRow("ScriptableObject", list, item => item.ScriptableObjectSize, item => item.ScriptableObjectCount)
+        };
+    }
+
+    static readonly Dictionary<string, (string Label, string Recommend)> ResourceLabelMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Texture"] = ("纹理资源", "210 MB"),
+        ["Mesh"] = ("网格资源", "75 MB"),
+        ["Material"] = ("材质资源", "2 MB"),
+        ["Shader"] = ("Shader资源", "50 MB"),
+        ["AnimationClip"] = ("动画片段", "60 MB"),
+        ["AudioClip"] = ("音频片段", "30 MB"),
+        ["Font"] = ("字体资源", "20 MB"),
+        ["TextAsset"] = ("TextAsset", "30 MB"),
+        ["ScriptableObject"] = ("其他", "-")
+    };
+
+    static ResourceSummaryRow BuildResRow(
+        string type,
+        List<RecordResInfoDto> list,
+        Func<RecordResInfoDto, long> sizeSelector,
+        Func<RecordResInfoDto, int> countSelector)
+    {
+        ResourceLabelMap.TryGetValue(type, out var meta);
+        return new ResourceSummaryRow
+        {
+            Type = type,
+            Label = string.IsNullOrWhiteSpace(meta.Label) ? type : meta.Label,
+            RecommendText = string.IsNullOrWhiteSpace(meta.Recommend) ? "-" : meta.Recommend,
+            AvgSizeBytes = (long)list.Average(item => sizeSelector(item)),
+            AvgCount = (int)list.Average(item => countSelector(item)),
+            PeakSizeBytes = list.Max(sizeSelector)
         };
     }
 

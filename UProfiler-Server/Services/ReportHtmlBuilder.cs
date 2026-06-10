@@ -47,44 +47,26 @@ public static class ReportHtmlBuilder
             PortalHtmlBuilder.NavTab.Report,
             string.IsNullOrWhiteSpace(packageName) ? null : packageName));
         sb.Append("<div class=\"layout\">");
-        sb.Append(BuildSidebar(data));
+        sb.Append(ReportSidebarBuilder.Build(data));
         sb.Append("<main class=\"main\">");
-        sb.Append(BuildHeader(data, productName));
-        sb.Append(BuildSummaryCards(data));
-        sb.Append("<section id=\"trend\" class=\"section\"><div class=\"section-title\">总体性能趋势</div>");
-        sb.Append(BuildDownsampleNote(chartPayload));
-        sb.Append("<div class=\"chart-grid\">");
-        sb.Append(BuildChartCard("fpsChart", "fps", "帧率报告"));
-        sb.Append(BuildChartCard("memoryChart", "memory", "内存占用"));
-        sb.Append(BuildChartCard("renderChart", "render", "渲染报告"));
-        if (hasPower)
-        {
-            sb.Append(BuildChartCard("powerChart", "power", "温度与功耗"));
-        }
-        if (hasPss)
-        {
-            sb.Append(BuildChartCard("pssChart", "pss", "PSS 内存"));
-        }
-        sb.Append("</div></section>");
-
+        sb.Append(BuildReportToolbar(data, productName));
+        sb.Append(ReportSectionsBuilder.BuildBriefSection(data));
+        sb.Append(ReportSectionsBuilder.BuildBasicInfoSection(data));
+        sb.Append(ReportSectionsBuilder.BuildSceneOverviewSection(data));
+        sb.Append(ReportSectionsBuilder.BuildSceneManagementSection(data));
+        sb.Append(ReportSectionsBuilder.BuildGpuSections(data));
+        sb.Append(BuildTrendSection(data, chartPayload, hasPower, hasPss));
         sb.Append(BuildModuleTimeSection(data));
-
-        sb.Append("""
-<section id="diagnosis" class="section"><div class="section-title">性能诊断</div>
-<div class="diag-toolbar">
-<button class="filter-btn active" data-filter="ALL">ALL</button>
-<button class="filter-btn low" data-filter="LOW">LOW</button>
-<button class="filter-btn medium" data-filter="MEDIUM">MEDIUM</button>
-<button class="filter-btn high" data-filter="HIGH">HIGH</button>
-</div><div class="diag-layout">
-<div id="diagList" class="diag-list"></div>
-<div id="diagDetail" class="diag-detail"></div>
-</div></section>
-""");
-
-        sb.Append(BuildInfoSection(data));
+        sb.Append(ReportSectionsBuilder.BuildThreadStackSection(data));
+        sb.Append(BuildDiagnosisSection());
+        sb.Append(ReportSectionsBuilder.BuildJankSections(data));
+        sb.Append(ReportSectionsBuilder.BuildMemorySections(data));
+        sb.Append(ReportSectionsBuilder.BuildBatterySection(data));
+        sb.Append(ReportSectionsBuilder.BuildTemperatureSection(data));
+        sb.Append(ReportSectionsBuilder.BuildCustomSections());
+        sb.Append(ReportSectionsBuilder.BuildResourceManagementSections(data));
         sb.Append(BuildFuncSection(data, funcJson));
-        sb.Append(BuildLogSection(data, logJson));
+        sb.Append(ReportSectionsBuilder.BuildLogSection(data, logJson));
         sb.Append("<footer class=\"footer\"><a href=\"/\">返回首页</a>");
         if (!string.IsNullOrWhiteSpace(packageName))
         {
@@ -101,10 +83,71 @@ public static class ReportHtmlBuilder
         sb.Append("<script>window.capturePayload=").Append(capturePayload).Append(";</script>");
         sb.Append("<script>window.reportSession=").Append(JsonSerializer.Serialize(data.SessionKey, JsonSafeHtml)).Append(";</script>");
         sb.Append("<script>window.diagnosisItems=").Append(diagnosisJson).Append(";</script>");
+        sb.Append("<script>window.scenePayload=").Append(JsonSerializer.Serialize(data.SceneManagement, JsonCamelCase)).Append(";</script>");
+        sb.Append("<script>window.briefPayload=").Append(JsonSerializer.Serialize(data.Brief, JsonCamelCase)).Append(";</script>");
+        sb.Append("<script>window.resourceSummary=").Append(JsonSerializer.Serialize(data.ResourceSummary, JsonCamelCase)).Append(";</script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("report.js")).Append("\"></script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("account.js")).Append("\"></script>");
         sb.Append("</body></html>");
         return sb.ToString();
+    }
+
+    static string BuildReportToolbar(ReportDataContext data, string productName)
+    {
+        return $"""
+<div class="report-toolbar">
+  <nav class="breadcrumb">
+    <span>{WebUtility.HtmlEncode(productName)}</span>
+    <span>/</span>
+    <span>{WebUtility.HtmlEncode(data.TestInfo?.Platform ?? "-")}</span>
+    <span>/</span>
+    <span id="breadcrumbPanel">性能简报</span>
+  </nav>
+  <div class="report-toolbar-meta">
+    <span>{WebUtility.HtmlEncode(data.DeviceInfo?.DeviceModel ?? "-")}</span>
+    <span>采样 {data.TestInfo?.IntervalFrame.ToString(CultureInfo.InvariantCulture) ?? "-"} 帧</span>
+  </div>
+</div>
+""";
+    }
+
+    static string BuildTrendSection(ReportDataContext data, string chartPayload, bool hasPower, bool hasPss)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<section id=\"trend\" class=\"section report-panel\" data-panel=\"trend\">");
+        sb.Append("<div class=\"section-title\">总体性能趋势</div>");
+        sb.Append(BuildDownsampleNote(chartPayload));
+        sb.Append("<div class=\"chart-grid\">");
+        sb.Append(BuildChartCard("fpsChart", "fps", "帧率报告"));
+        sb.Append(BuildChartCard("memoryChart", "memory", "内存占用"));
+        sb.Append(BuildChartCard("renderChart", "render", "渲染报告"));
+        if (hasPower)
+        {
+            sb.Append(BuildChartCard("powerChart", "power", "温度与功耗"));
+        }
+        if (hasPss)
+        {
+            sb.Append(BuildChartCard("pssChart", "pss", "PSS 内存"));
+        }
+        sb.Append("</div></section>");
+        return sb.ToString();
+    }
+
+    static string BuildDiagnosisSection()
+    {
+        return """
+<section id="diagnosis" class="section report-panel" data-panel="diagnosis">
+<div class="section-title">性能诊断</div>
+<div class="diag-toolbar">
+<button class="filter-btn active" data-filter="ALL">ALL</button>
+<button class="filter-btn low" data-filter="LOW">LOW</button>
+<button class="filter-btn medium" data-filter="MEDIUM">MEDIUM</button>
+<button class="filter-btn high" data-filter="HIGH">HIGH</button>
+</div><div class="diag-layout">
+<div id="diagList" class="diag-list"></div>
+<div id="diagDetail" class="diag-detail"></div>
+</div></section>
+""";
     }
 
     static string BuildChartCard(string id, string chartType, string title)
@@ -159,7 +202,7 @@ public static class ReportHtmlBuilder
     static string BuildChartPayload(ReportDataContext data)
     {
         var fps = data.FrameRates?.FrameRateList ?? new List<UProfilerFrameInfoDto>();
-        var monitor = data.UProfilerInfos?.UProfilerInfoList ?? new List<UProfilerInfoDto>();
+        var monitor = data.UProfilerInfos?.GetAll() ?? new List<UProfilerInfoDto>();
         var render = data.RenderInfos?.RenderInfoList ?? new List<RenderInfoDto>();
         var pss = data.MemoryUseDatas?.MemoryUsedList ?? new List<MemoryUseDataDto>();
         var power = data.PowerInfos?.DevicePowerConsumeInfos ?? new List<DevicePowerConsumeInfoDto>();
@@ -202,6 +245,11 @@ public static class ReportHtmlBuilder
                 renderShown
             },
             fps = new { x = fpsX, y = fpsY },
+            frametime = new
+            {
+                x = fpsX,
+                y = fpsY.Select(f => f > 0 ? Math.Round(1000.0 / f, 2) : 0).ToArray()
+            },
             memory = new { x = memX, monoUsed = mono, totalAllocated = total, unityReserved = reserved },
             render = new { x = renderX, setPass, drawCall, vertices, triangles },
             pss = new { x = pssX, y = pssY },
@@ -236,7 +284,7 @@ public static class ReportHtmlBuilder
         if (data.ModuleTime.X.Count == 0)
         {
             return """
-<section id="module-time" class="section"><div class="section-title">模块耗时统计</div>
+<section id="module-time" class="section report-panel" data-panel="module-time"><div class="section-title">模块耗时统计</div>
 <p class="muted">暂无帧率采样数据，无法生成模块耗时统计。</p></section>
 """;
         }
@@ -261,7 +309,7 @@ public static class ReportHtmlBuilder
         }
 
         return $"""
-<section id="module-time" class="section">
+<section id="module-time" class="section report-panel" data-panel="module-time">
 <div class="section-title">模块耗时统计</div>
 <p class="muted module-note">点击饼图或表格行进入模块详情；点击图表采样点可在左侧查看对应截图。</p>
 <div class="module-layout">
@@ -425,104 +473,15 @@ public static class ReportHtmlBuilder
         return JsonSerializer.Serialize(data.ModuleDetails, JsonCamelCase);
     }
 
-    static string BuildSidebar(ReportDataContext data)
-    {
-        var sb = new StringBuilder();
-        sb.Append("""
-<aside class="sidebar">
-  <div class="brand">UProfiler</div>
-  <nav>
-    <a href="#overview">性能总结</a>
-    <a href="#trend">总体性能趋势</a>
-    <a class="sidebar-sub" href="#module-time" data-module-nav="overview">模块耗时统计</a>
-""");
-
-        foreach (var module in data.ModuleTime.Modules)
-        {
-            sb.Append("<a class=\"sidebar-sub module-nav-link\" href=\"#module-time/")
-                .Append(WebUtility.HtmlEncode(module.Key))
-                .Append("\" data-module-nav=\"")
-                .Append(WebUtility.HtmlEncode(module.Key))
-                .Append("\">")
-                .Append(WebUtility.HtmlEncode(module.Label))
-                .Append("模块</a>");
-        }
-
-        sb.Append("""
-    <a href="#diagnosis">性能诊断</a>
-    <a href="#info">基础与设备信息</a>
-    <a href="#func">函数性能</a>
-    <a href="#log">运行日志</a>
-  </nav>
-</aside>
-""");
-        return sb.ToString();
-    }
-
-    static string BuildHeader(ReportDataContext data, string productName)
-    {
-        return $"""
-<section id="overview" class="hero">
-  <div>
-    <div class="hero-tag">Unity 性能监控报表</div>
-    <h1>{WebUtility.HtmlEncode(productName)}</h1>
-    <p class="hero-sub">会话 {WebUtility.HtmlEncode(data.SessionKey)} · 包名 {WebUtility.HtmlEncode(data.TestInfo?.PackageName ?? data.PackageName ?? "-")}</p>
-  </div>
-  <div class="hero-meta">
-    <div><span>平台</span><b>{WebUtility.HtmlEncode(data.TestInfo?.Platform ?? "-")}</b></div>
-    <div><span>版本</span><b>{WebUtility.HtmlEncode(data.TestInfo?.Version ?? "-")}</b></div>
-    <div><span>测试时长</span><b>{WebUtility.HtmlEncode(data.TestInfo?.TestTime ?? "-")}</b></div>
-    <div><span>采样间隔</span><b>{data.TestInfo?.IntervalFrame.ToString(CultureInfo.InvariantCulture) ?? "-"} 帧</b></div>
-  </div>
-</section>
-""";
-    }
-
-    static string BuildSummaryCards(ReportDataContext data)
-    {
-        return $"""
-<div class="cards">
-  <div class="card kpi"><div class="label">平均 FPS</div><div class="value">{data.AvgFps:F1}</div><div class="hint">最低 {data.MinFps} / 最高 {data.MaxFps}</div></div>
-  <div class="card kpi"><div class="label">Mono 峰值</div><div class="value">{FormatBytesShort(data.PeakMonoUsed)}</div><div class="hint">Total {FormatBytesShort(data.PeakTotalAllocated)}</div></div>
-  <div class="card kpi"><div class="label">DrawCall 峰值</div><div class="value">{data.PeakDrawCall}</div><div class="hint">三角面 {data.PeakTriangles}</div></div>
-  <div class="card kpi"><div class="label">诊断项</div><div class="value">{data.DiagnosisItems.Count}</div><div class="hint">HIGH {data.DiagnosisItems.Count(item => item.Severity == "HIGH")} / MED {data.DiagnosisItems.Count(item => item.Severity == "MEDIUM")}</div></div>
-</div>
-""";
-    }
-
-    static string BuildInfoSection(ReportDataContext data)
-    {
-        var sb = new StringBuilder();
-        sb.Append("<section id=\"info\" class=\"section\"><div class=\"section-title\">基础与设备信息</div><div class=\"info-grid\">");
-        sb.Append("<div class=\"info-card\"><h3>测试信息</h3><table>");
-        AppendInfoRow(sb, "产品名", data.TestInfo?.ProductName);
-        AppendInfoRow(sb, "包名", data.TestInfo?.PackageName);
-        AppendInfoRow(sb, "平台", data.TestInfo?.Platform);
-        AppendInfoRow(sb, "版本号", data.TestInfo?.Version);
-        AppendInfoRow(sb, "测试时长", data.TestInfo?.TestTime);
-        sb.Append("</table></div>");
-
-        sb.Append("<div class=\"info-card\"><h3>设备信息</h3><table>");
-        AppendInfoRow(sb, "Unity 版本", data.DeviceInfo?.UnityVersion);
-        AppendInfoRow(sb, "操作系统", data.DeviceInfo?.OperatingSystem);
-        AppendInfoRow(sb, "设备型号", data.DeviceInfo?.DeviceModel);
-        AppendInfoRow(sb, "处理器", data.DeviceInfo?.ProcessorType);
-        AppendInfoRow(sb, "显卡", data.DeviceInfo?.GraphicsDeviceName);
-        AppendInfoRow(sb, "分辨率", data.DeviceInfo == null ? null : $"{data.DeviceInfo.ScreenWidth} x {data.DeviceInfo.ScreenHeight}");
-        AppendInfoRow(sb, "系统内存", data.DeviceInfo?.SystemMemorySize.ToString(CultureInfo.InvariantCulture) + " MB");
-        sb.Append("</table></div></div></section>");
-        return sb.ToString();
-    }
-
     static string BuildFuncSection(ReportDataContext data, string funcJson)
     {
         if (data.FuncAnalysis.Count == 0)
         {
-            return "<section id=\"func\" class=\"section\"><div class=\"section-title\">函数性能分析</div><p class=\"muted\">暂无函数性能数据。请在 Unity 菜单执行 Hook 注入并启用函数分析。</p></section>";
+            return "<section id=\"func\" class=\"section report-panel\" data-panel=\"func\"><div class=\"section-title\">函数性能分析</div><p class=\"muted\">暂无函数性能数据。请在 Unity 菜单执行 Hook 注入并启用函数分析。</p></section>";
         }
 
         return $"""
-<section id="func" class="section">
+<section id="func" class="section report-panel" data-panel="func">
 <div class="section-title">函数性能分析</div>
 <div class="table-toolbar"><span class="muted">按平均耗时降序 · 分页加载减少 DOM 占用</span>
 <div class="pager"><button id="funcPrev" type="button">上一页</button><span id="funcPageInfo"></span><button id="funcNext" type="button">下一页</button></div></div>
@@ -531,40 +490,5 @@ public static class ReportHtmlBuilder
 <script type="application/json" id="funcData">{funcJson}</script>
 </section>
 """;
-    }
-
-    static string BuildLogSection(ReportDataContext data, string logJson)
-    {
-        if (data.LogLines.Count == 0)
-        {
-            return "<section id=\"log\" class=\"section\"><div class=\"section-title\">运行日志</div><p class=\"muted\">暂无日志数据。可在 GOT 中启用 Log 监控。</p></section>";
-        }
-
-        return $"""
-<section id="log" class="section">
-<div class="section-title">运行日志</div>
-<div class="table-toolbar"><span class="muted">共 {data.LogLines.Count} 行 · 分批加载</span>
-<button id="logMore" type="button" class="link-btn">加载更多</button></div>
-<div id="logBox" class="log-box"></div>
-<script type="application/json" id="logData">{logJson}</script>
-</section>
-""";
-    }
-
-    static void AppendInfoRow(StringBuilder sb, string label, string? value)
-    {
-        sb.Append("<tr><th>").Append(WebUtility.HtmlEncode(label)).Append("</th><td>");
-        sb.Append(WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(value) ? "-" : value));
-        sb.Append("</td></tr>");
-    }
-
-    static string FormatBytesShort(long bytes)
-    {
-        if (bytes < 1024 * 1024)
-        {
-            return $"{bytes / 1024.0:F0} KB";
-        }
-
-        return $"{bytes / 1024.0 / 1024.0:F1} MB";
     }
 }
