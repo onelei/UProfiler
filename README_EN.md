@@ -1,5 +1,5 @@
-<p align="right">
-  <img src="https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge" alt="v1.1.0">
+﻿<p align="right">
+  <img src="https://img.shields.io/badge/version-1.1.1-blue?style=for-the-badge" alt="v1.1.1">
   <a href="CHANGELOG_EN.md"><img src="https://img.shields.io/badge/changelog-Changelog-lightgrey?style=for-the-badge" alt="Changelog"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/lang-&#31616;&#20307;&#20013;&#25991;-lightgrey?style=for-the-badge" alt="Simplified Chinese"></a>
   <img src="https://img.shields.io/badge/lang-English-blue?style=for-the-badge" alt="English">
@@ -326,7 +326,7 @@ Runtime directories (auto-created under the output folder):
 
 ## Version & Changelog
 
-Current version: **1.1.0** (see `VERSION` at repo root)
+Current version: **1.1.1** (see `VERSION` at repo root)
 
 - Changelog (Chinese): [CHANGELOG.md](CHANGELOG.md)
 - Changelog (English): [CHANGELOG_EN.md](CHANGELOG_EN.md)
@@ -343,3 +343,4 @@ The script updates `VERSION`, `package.json`, server assembly version, Unity `UP
 ## License
 
 TBD
+

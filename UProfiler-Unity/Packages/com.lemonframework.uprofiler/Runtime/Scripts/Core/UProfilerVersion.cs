@@ -1,7 +1,8 @@
-namespace LemonFramework.UProfiler
+﻿namespace LemonFramework.UProfiler
 {
     public static class UProfilerVersion
     {
-        public const string Version = "1.1.0";
+        public const string Version = "1.1.1";
     }
 }
+

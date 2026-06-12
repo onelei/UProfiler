@@ -6,6 +6,15 @@
 
 ## [未发布]
 
+## [1.1.1] - 2026-06-12
+
+### 变更
+
+- 优化报告页左侧页签切换性能：缓存 panel / sidebar DOM 引用，消除重复的 `activatePanel` 调用
+- 图表改为分批懒加载（首个立即渲染，其余 `requestIdleCallback` 异步加载），切换时仅 resize 当前 panel 内图表
+- 页签切换改为即时滚动；隐藏 panel 使用 `content-visibility: hidden` 降低浏览器渲染开销
+- 页面加载时预加载 ECharts；静态资源缓存版本更新为 `111`
+
 ## [1.1.0] - 2026-06-09
 
 ### 新增
@@ -54,6 +63,7 @@
 - Android 真机 PSS / 功耗采集
 - 启动脚本 `start.bat` / `stop.bat`
 
+[1.1.1]: https://github.com/lemonframework/UProfiler/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lemonframework/UProfiler/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/lemonframework/UProfiler/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/lemonframework/UProfiler/compare/v1.0.0...v1.0.1

@@ -6,6 +6,15 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-12
+
+### Changed
+
+- Improved report page sidebar tab switching: cached panel/sidebar DOM refs, removed duplicate `activatePanel` calls
+- Charts load in batches (first chart immediately, rest via `requestIdleCallback`); only charts in the active panel are resized on switch
+- Instant scroll on tab change; hidden panels use `content-visibility: hidden` to reduce rendering cost
+- Preload ECharts on page load; static asset cache version bumped to `111`
+
 ## [1.1.0] - 2026-06-09
 
 ### Added
@@ -54,6 +63,7 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 - Android device PSS / power consumption
 - `start.bat` / `stop.bat` scripts
 
+[1.1.1]: https://github.com/lemonframework/UProfiler/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lemonframework/UProfiler/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/lemonframework/UProfiler/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/lemonframework/UProfiler/compare/v1.0.0...v1.0.1
