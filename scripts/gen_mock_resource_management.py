@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """为指定会话生成 resourceManagement_ 与 moduleFuncStack_ 临时数据。
 
-正式数据需 Unity 端上传，见 todo.md 对应条目。
+正式数据需 Unity 端上传，见 uwa/todo.md 对应条目。
 """
 import json
 import os

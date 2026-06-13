@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """为指定会话生成 hardwareInfo_ 临时数据（CPU频率/网络收发/low memory 事件）。
 
-正式数据需 Unity 端上传，见 todo.md「hardwareInfo_」条目。
+正式数据需 Unity 端上传，见 uwa/todo.md「hardwareInfo_」条目。
 """
 import json
 import math
