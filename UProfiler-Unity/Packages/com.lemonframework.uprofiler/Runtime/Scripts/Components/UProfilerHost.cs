@@ -14,12 +14,12 @@ namespace LemonFramework.UProfiler.Components
 {
     public class UProfilerHost : MonoBehaviour
     {
-        [Header("Enable log capture")] public bool enableLog = false;
-        [Header("Capture frame screenshots")] public bool enableFrameTexture = false;
+        [Header("Enable log capture")] public bool enableLog = true;
+        [Header("Capture frame screenshots")] public bool enableFrameTexture = true;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         [Header("Function analysis (requires IL inject via Hook menu)")]
-        public bool enableFunctionAnalysis = false;
+        public bool enableFunctionAnalysis = true;
 #endif
 
         [Header("Mobile power / battery stats (Android)")]
@@ -33,6 +33,11 @@ namespace LemonFramework.UProfiler.Components
 #endif
         [Header("Sample interval (frames)")] [Range(10, 1000)]
         public int intervalFrame = 100;
+
+        [Header("Extended UWA report uploads")]
+        public bool enableModuleTime = true;
+        public bool enableHardwareInfo = true;
+        public bool enableExtendedReports = true;
 
         [Header("Frames to skip after start")] public int ignoreFrameCount = 5;
 
@@ -99,6 +104,9 @@ namespace LemonFramework.UProfiler.Components
 #endif
         string sceneInfoFilePath;
         SceneInfoData _sceneInfoData = new SceneInfoData();
+        ModuleTimeSampler _moduleTimeSampler;
+        HardwareInfoSampler _hardwareInfoSampler;
+        readonly List<LuaMemoryUploadData> _luaMemorySnapshots = new List<LuaMemoryUploadData>();
         string _activeSceneName = "";
         int _activeSceneStartFrame = 1;
         //
@@ -166,9 +174,9 @@ namespace LemonFramework.UProfiler.Components
                 frameRateFilePath =
                     $"{Application.persistentDataPath}/{ConstString.frameRatefix}{_startTime}{fileExt}";
 #if UNITY_ANDROID && !UNITY_EDITOR
-            if (EnableMobileConsumptionInfo)
+            if (enableMobileConsumptionInfo)
                 powerConsumeFilePath =
- $"{Application.persistentDataPath}/{ConstString.PowerConsumePrefix}{m_StartTime}{fileExt}";
+                    $"{Application.persistentDataPath}/{ConstString.powerConsumePrefix}{_startTime}{fileExt}";
 #endif
                 if (enableResMemoryDistributionInfo)
                 {
@@ -176,7 +184,7 @@ namespace LemonFramework.UProfiler.Components
                         $"{Application.persistentDataPath}/{ConstString.resMemoryDistributionPrefix}{_startTime}{fileExt}";
 #if UNITY_ANDROID && !UNITY_EDITOR
                 pssMemoryUsedFilePath =
- $"{Application.persistentDataPath}/{ConstString.PssMemoryPrefix}{m_StartTime}{fileExt}";
+                    $"{Application.persistentDataPath}/{ConstString.pssMemoryPrefix}{_startTime}{fileExt}";
 #endif
                 }
 #if UNITY_2020_1_OR_NEWER
@@ -187,6 +195,7 @@ namespace LemonFramework.UProfiler.Components
                 sceneInfoFilePath =
                     $"{Application.persistentDataPath}/{ConstString.sceneInfoPrefix}{_startTime}{fileExt}";
                 BeginSceneTracking();
+                BeginExtendedTracking();
                 if (enableLog)
                 {
                     LogManager.CreateLogFile(logFilePath, System.IO.FileMode.Append);
@@ -218,6 +227,7 @@ namespace LemonFramework.UProfiler.Components
                 UProfilerInfosReport();
                 FrameRateInfosReport();
                 SceneInfoReport();
+                ExtendedReportsReport();
 #if UNITY_2020_1_OR_NEWER
                 if (enableRenderInfo)
                     RenderInfosReport();
@@ -229,7 +239,7 @@ namespace LemonFramework.UProfiler.Components
                     FuncAnalysisReport();
 #endif
 #if UNITY_ANDROID && !UNITY_EDITOR
-            if (EnableMobileConsumptionInfo) //
+            if (enableMobileConsumptionInfo) //
             {
                 MobileConsumptionInfoReport();
                 MobilePssMemoryUseReport();
@@ -313,6 +323,49 @@ namespace LemonFramework.UProfiler.Components
                 endFrame = endFrame,
                 note = ""
             });
+        }
+
+        void BeginExtendedTracking()
+        {
+            _luaMemorySnapshots.Clear();
+            ResourceEventTracker.Clear();
+            CustomDataTracker.Clear();
+            _moduleTimeSampler?.Dispose();
+            _hardwareInfoSampler?.Dispose();
+            _moduleTimeSampler = enableModuleTime ? new ModuleTimeSampler() : null;
+            _hardwareInfoSampler = enableHardwareInfo ? new HardwareInfoSampler() : null;
+        }
+
+        void EndExtendedTracking()
+        {
+            _moduleTimeSampler?.Dispose();
+            _moduleTimeSampler = null;
+            _hardwareInfoSampler?.Dispose();
+            _hardwareInfoSampler = null;
+        }
+
+        void ExtendedReportsReport()
+        {
+            var totalFrames = Math.Max(1, _frameIndex - ignoreFrameCount);
+            UploadSessionReporter.WriteExtendedReports(
+                _startTime,
+                fileExt,
+                totalFrames,
+                enableModuleTime,
+                enableHardwareInfo,
+                enableExtendedReports,
+                _moduleTimeSampler,
+                _hardwareInfoSampler,
+                _renderInfos,
+                _luaMemorySnapshots,
+                out var files);
+
+            foreach (var path in files)
+            {
+                UploadFile(path);
+            }
+
+            EndExtendedTracking();
         }
 
         void FinishSceneTracking()
@@ -637,12 +690,29 @@ namespace LemonFramework.UProfiler.Components
                             allocatedMemoryForGraphicsDriver = Profiler.GetAllocatedMemoryForGraphicsDriver()
                         };
                         uprofilerInfos.uProfilerInfoList.Add(uprofilerInfo);
+                        ResourceEventTracker.SetCurrentFrame(relativeIndex);
+                        if (enableModuleTime && _moduleTimeSampler != null && _moduleTimeSampler.IsSupported)
+                        {
+                            _moduleTimeSampler.Sample(relativeIndex);
+                        }
+
+                        if (enableHardwareInfo && _hardwareInfoSampler != null)
+                        {
+                            _hardwareInfoSampler.Sample(relativeIndex);
+                        }
+
+                        var luaSnapshot = LuaMemoryProvider.TryBuildSnapshot(relativeIndex);
+                        if (luaSnapshot != null)
+                        {
+                            _luaMemorySnapshots.Add(luaSnapshot);
+                        }
+
 #if UNITY_ANDROID && !UNITY_EDITOR
-                    if (EnableMobileConsumptionInfo)
+                    if (enableMobileConsumptionInfo)
                     {
                         GetPowerConsume(relativeIndex);
                     }
-                    if (EnableResMemoryDistributionInfo)
+                    if (enableResMemoryDistributionInfo)
                     {
                         GetFramePssMemory(relativeIndex);
                     }
@@ -810,6 +880,7 @@ namespace LemonFramework.UProfiler.Components
 
         void OnDisable()
         {
+#if UNITY_2020_1_OR_NEWER
             if (enableRenderInfo)
             {
                 setPassCallRecord.Dispose();
@@ -817,6 +888,8 @@ namespace LemonFramework.UProfiler.Components
                 verticesRecord.Dispose();
                 trianglesRecord.Dispose();
             }
+#endif
+            EndExtendedTracking();
         }
     }
 }

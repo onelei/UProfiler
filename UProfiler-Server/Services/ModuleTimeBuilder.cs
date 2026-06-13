@@ -119,6 +119,46 @@ public static class ModuleTimeBuilder
         };
     }
 
+    public static ModuleTimePayload EnrichUploaded(ModuleTimePayload uploaded)
+    {
+        if (uploaded.Modules.Count > 0 && uploaded.Summary.Count > 0)
+        {
+            return uploaded;
+        }
+
+        var modules = ModuleDefinitions.Select(item => new ModuleMeta
+        {
+            Key = item.Key,
+            Label = item.Label,
+            Color = item.Color,
+            RecommendMs = item.RecommendMs
+        }).ToList();
+
+        var summary = ModuleDefinitions.Select(module =>
+        {
+            uploaded.Series.TryGetValue(module.Key, out var values);
+            values ??= new List<double>();
+            var avg = values.Count > 0 ? values.Average() : 0;
+            return new ModuleSummaryRow
+            {
+                Key = module.Key,
+                Label = module.Label,
+                Color = module.Color,
+                AverageMs = Math.Round(avg, 2),
+                RecommendMs = module.RecommendMs,
+                OverRecommend = avg > module.RecommendMs
+            };
+        }).ToList();
+
+        return new ModuleTimePayload
+        {
+            Modules = modules,
+            X = uploaded.X,
+            Series = uploaded.Series,
+            Summary = summary
+        };
+    }
+
     static ModuleTimePayload EmptyPayload() => new()
     {
         Modules = ModuleDefinitions.Select(item => new ModuleMeta

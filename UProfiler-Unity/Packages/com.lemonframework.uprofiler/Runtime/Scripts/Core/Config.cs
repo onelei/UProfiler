@@ -60,5 +60,17 @@ namespace LemonFramework.UProfiler.Core
         public const string renderPrefix = "renderInfo_";
         public const string pssMemoryPrefix = "pssMemoryInfo_";
         public const string sceneInfoPrefix = "sceneInfo_";
+        public const string moduleTimePrefix = "moduleTime_";
+        public const string threadStackPrefix = "threadStack_";
+        public const string moduleFuncStackPrefix = "moduleFuncStack_";
+        public const string briefAiDiagnosisPrefix = "briefAiDiagnosis_";
+        public const string hardwareInfoPrefix = "hardwareInfo_";
+        public const string gpuBandwidthPrefix = "gpuBandwidth_";
+        public const string luaMemoryPrefix = "luaMemory_";
+        public const string resourceManagementPrefix = "resourceManagement_";
+        public const string customDashboardPrefix = "customDashboard_";
+        public const string apiFuncsPrefix = "apiFuncs_";
+        public const string apiInfoPrefix = "apiInfo_";
+        public const string apiCodeFramePrefix = "apiCodeFrame_";
     }
 }

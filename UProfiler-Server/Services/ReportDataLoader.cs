@@ -13,6 +13,7 @@ public static class ReportDataLoader
 
     public static ReportDataContext Load(string sessionKey, string? packageName, IReadOnlyList<SessionUpload> files)
     {
+        var moduleTimeUploaded = ReadJson<ModuleTimePayload>(files, "moduleTime");
         var testInfo = ReadJson<TestInfoDto>(files, "test");
         var deviceInfo = ReadJson<DeviceInfoDto>(files, "device");
         var frameRates = ReadJson<FrameRatesDto>(files, "frameRate");
@@ -25,6 +26,7 @@ public static class ReportDataLoader
         var sceneInfo = ReadJson<SceneInfoDto>(files, "sceneInfo");
         var threadStackRaw = ReadJson<ThreadStackPayload>(files, "threadStack");
         var briefAiDiagnosis = ReadJson<BriefAiDiagnosisDto>(files, "briefAiDiagnosis");
+        var hardwareInfo = ReadJson<HardwareInfoDto>(files, "hardwareInfo");
         var gpuBandwidth = ReadJson<GpuBandwidthDto>(files, "gpuBandwidth");
         var luaMemory = ReadJson<LuaMemoryDto>(files, "luaMemory");
         var resourceManagement = ReadJson<ResourceManagementDto>(files, "resourceManagement");
@@ -64,6 +66,7 @@ public static class ReportDataLoader
             SceneInfo = sceneInfo,
             ThreadStack = threadStackRaw ?? new ThreadStackPayload(),
             BriefAiDiagnosis = briefAiDiagnosis,
+            HardwareInfo = hardwareInfo,
             GpuBandwidth = gpuBandwidth,
             LuaMemory = luaMemory,
             ResourceManagement = resourceManagement,
@@ -97,7 +100,9 @@ public static class ReportDataLoader
                 powerList)
         };
 
-        var moduleTime = ModuleTimeBuilder.Build(context);
+        var moduleTime = moduleTimeUploaded != null && moduleTimeUploaded.X.Count > 0
+            ? ModuleTimeBuilder.EnrichUploaded(moduleTimeUploaded)
+            : ModuleTimeBuilder.Build(context);
         var enriched = context with
         {
             ModuleTime = moduleTime,

@@ -123,6 +123,22 @@ public sealed class DevicePowerConsumeInfosDto
     public List<DevicePowerConsumeInfoDto> DevicePowerConsumeInfos { get; set; } = new();
 }
 
+public sealed class HardwareSampleDto
+{
+    public int FrameIndex { get; set; }
+    public double CpuFreqMHz { get; set; }
+    public double NetSentKB { get; set; }
+    public double NetRecvKB { get; set; }
+    public bool LowMemory { get; set; }
+}
+
+public sealed class HardwareInfoDto
+{
+    public int TargetFrameRate { get; set; }
+    public string NetworkType { get; set; } = "";
+    public List<HardwareSampleDto> Samples { get; set; } = new();
+}
+
 public sealed class SessionUpload
 {
     public required string OriginalName { get; init; }
@@ -374,6 +390,12 @@ public sealed class ModuleFuncStackMetricRow
     public double AvgMs { get; init; }
     public double PeakMs { get; init; }
     public int PeakFrame { get; init; }
+
+    /// <summary>指标单位，默认 ms；支持 个/次/% 等非耗时指标（对应 UWA GL Batches、SyncTransform 调用次数等）。</summary>
+    public string Unit { get; init; } = "ms";
+
+    /// <summary>统计口径文案：均值 / 峰值 / 显著帧均值 / 调用频率。</summary>
+    public string StatLabel { get; init; } = "均值";
 }
 
 public sealed class ModuleFuncStackAiEntry
@@ -597,6 +619,10 @@ public sealed class JankAnalysisPayload
     public int SevereJankCount { get; init; }
     public int LoadingJankCount { get; init; }
     public int OtherJankCount { get; init; }
+    public int GcJankCount { get; init; }
+    public int UnloadJankCount { get; init; }
+    public int AnimationJankCount { get; init; }
+    public int PhysicsJankCount { get; init; }
     public List<JankFrameRow> Frames { get; init; } = new();
     public List<JankFunctionRow> HotFunctions { get; init; } = new();
     public List<JankHotFunctionRow> JankHotFunctions { get; init; } = new();
@@ -637,6 +663,7 @@ public sealed record ReportDataContext
     public List<ResourceSummaryRow> ResourceSummary { get; init; } = new();
     public ThreadStackPayload ThreadStack { get; init; } = new();
     public BriefAiDiagnosisDto? BriefAiDiagnosis { get; init; }
+    public HardwareInfoDto? HardwareInfo { get; init; }
     public GpuBandwidthDto? GpuBandwidth { get; init; }
     public LuaMemoryDto? LuaMemory { get; init; }
     public ResourceManagementDto? ResourceManagement { get; init; }

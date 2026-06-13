@@ -119,7 +119,16 @@ namespace LemonFramework.UProfiler.Core
                 }
 
                 var nowTime = DateTime.Now.ToString(CultureInfo.InvariantCulture);
-                var logStr = $"[{nowTime}]{ColorTypeLog(logType, msg)} \n\rstackTrace:{stackTrace}";
+                var logStr = $"[{nowTime}]{ColorTypeLog(logType, msg)}";
+                if (!string.IsNullOrEmpty(stackTrace))
+                {
+                    logStr += $"\n{stackTrace.TrimEnd()}";
+                }
+                else
+                {
+                    logStr += " \n\rstackTrace:";
+                }
+
                 byte[] data = Encoding.Default.GetBytes(logStr);
 
                 if (_logFileStream == null)

@@ -52,13 +52,17 @@ public static class ModulePerfSectionBuilder
         sb.Append("<div class=\"uwa-metric-grid module-kpi-grid\" data-draggable-grid>");
         foreach (var metric in metrics)
         {
+            var unit = string.IsNullOrWhiteSpace(metric.Unit) ? "ms" : metric.Unit;
+            var statLabel = string.IsNullOrWhiteSpace(metric.StatLabel) ? "均值" : metric.StatLabel;
             sb.Append("<div class=\"uwa-metric-card\" draggable=\"true\"><div class=\"uwa-metric-title\">")
                 .Append(WebUtility.HtmlEncode(metric.Label))
                 .Append("<span class=\"muted uwa-drag-hint\">长按可拖拽排序</span></div><div class=\"uwa-metric-value\">")
                 .Append(metric.AvgMs.ToString("F2", CultureInfo.InvariantCulture))
-                .Append(" <span>ms</span></div><div class=\"uwa-metric-hint muted\">峰值 ")
+                .Append(" <span>").Append(WebUtility.HtmlEncode(unit)).Append("</span></div><div class=\"uwa-metric-hint muted\">")
+                .Append(WebUtility.HtmlEncode(statLabel)).Append(" · 最大值 ")
                 .Append(metric.PeakMs.ToString("F2", CultureInfo.InvariantCulture))
-                .Append(" ms · 第").Append(metric.PeakFrame).Append("帧</div></div>");
+                .Append(' ').Append(WebUtility.HtmlEncode(unit))
+                .Append(" · 第").Append(metric.PeakFrame).Append("帧</div></div>");
         }
 
         sb.Append("</div>");

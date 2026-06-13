@@ -91,6 +91,7 @@ public static class ReportHtmlBuilder
         sb.Append("<script>window.luaMemoryPayload=").Append(JsonSerializer.Serialize(data.LuaMemory, JsonCamelCase)).Append(";</script>");
         sb.Append("<script>window.customDashboardPayload=").Append(JsonSerializer.Serialize(data.CustomDashboard, JsonCamelCase)).Append(";</script>");
         sb.Append("<script>window.resourceSummary=").Append(JsonSerializer.Serialize(data.ResourceSummary, JsonCamelCase)).Append(";</script>");
+        sb.Append("<script>window.moduleFuncStacks=").Append(JsonSerializer.Serialize(data.ModuleFuncStacks, JsonCamelCase)).Append(";</script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("report.js")).Append("\"></script>");
         sb.Append("<script defer src=\"").Append(StaticAssets.Js("account.js")).Append("\"></script>");
         sb.Append("</body></html>");
@@ -99,6 +100,14 @@ public static class ReportHtmlBuilder
 
     static string BuildReportToolbar(ReportDataContext data, string productName)
     {
+        var hw = data.HardwareInfo;
+        var fpsBadge = hw?.TargetFrameRate > 0
+            ? $"<span class=\"toolbar-badge\" title=\"目标帧率\">{hw.TargetFrameRate} FPS</span>"
+            : "";
+        var netBadge = !string.IsNullOrWhiteSpace(hw?.NetworkType)
+            ? $"<span class=\"toolbar-badge\" title=\"网络制式\">{WebUtility.HtmlEncode(hw.NetworkType)}</span>"
+            : "";
+
         return $"""
 <div class="report-toolbar">
   <nav class="breadcrumb">
@@ -109,8 +118,10 @@ public static class ReportHtmlBuilder
     <span id="breadcrumbPanel">性能简报</span>
   </nav>
   <div class="report-toolbar-meta">
+    {fpsBadge}{netBadge}
     <span>{WebUtility.HtmlEncode(data.DeviceInfo?.DeviceModel ?? "-")}</span>
     <span>采样 {data.TestInfo?.IntervalFrame.ToString(CultureInfo.InvariantCulture) ?? "-"} 帧</span>
+    <button type="button" class="link-btn" id="reportDownloadJson" title="下载本报告全部结构化数据">下载 JSON</button>
   </div>
 </div>
 """;
@@ -238,6 +249,13 @@ public static class ReportHtmlBuilder
         var cpuTemp = power.Select(item => item.CpuTemperate).ToArray();
         DownsamplePower(ref powerX, ref batteryPower, ref cpuTemp, out var powerOriginal, out var powerShown);
 
+        var hardware = data.HardwareInfo?.Samples ?? new List<HardwareSampleDto>();
+        var hwX = hardware.Select(item => item.FrameIndex).ToArray();
+        var cpuFreq = hardware.Select(item => Math.Round(item.CpuFreqMHz, 2)).ToArray();
+        var netRecv = hardware.Select(item => Math.Round(item.NetRecvKB, 2)).ToArray();
+        var netSent = hardware.Select(item => Math.Round(item.NetSentKB, 2)).ToArray();
+        var lowMemoryFrames = hardware.Where(item => item.LowMemory).Select(item => item.FrameIndex).ToArray();
+
         var payload = new
         {
             meta = new
@@ -258,7 +276,9 @@ public static class ReportHtmlBuilder
             memory = new { x = memX, monoUsed = mono, totalAllocated = total, unityReserved = reserved },
             render = new { x = renderX, setPass, drawCall, vertices, triangles },
             pss = new { x = pssX, y = pssY },
-            power = new { x = powerX, batteryPower, cpuTemp }
+            power = new { x = powerX, batteryPower, cpuTemp },
+            hardware = new { x = hwX, cpuFreq, netRecv, netSent },
+            lowMemoryFrames
         };
 
         return JsonSerializer.Serialize(payload, JsonCamelCase);

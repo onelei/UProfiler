@@ -438,7 +438,7 @@
         yAxis: { type: 'value', name: 'MB' },
         dataZoom: baseZoom(),
         series: [
-          { name: 'MonoUsed', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.memory.monoUsed, itemStyle: { color: '#722ed1' } },
+          { name: 'MonoUsed', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.memory.monoUsed, itemStyle: { color: '#722ed1' }, markLine: buildLowMemoryMarkLine() },
           { name: 'TotalAllocated', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.memory.totalAllocated, itemStyle: { color: '#1677ff' } },
           { name: 'UnityReserved', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, data: p.memory.unityReserved, itemStyle: { color: '#13c2c2' } }
         ]
@@ -481,7 +481,37 @@
         xAxis: { type: 'category', data: p.pss.x, name: '帧' },
         yAxis: { type: 'value', name: 'MB' },
         dataZoom: baseZoom(),
-        series: [{ name: 'PSS', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, areaStyle: {}, data: p.pss.y, itemStyle: { color: '#1677ff' } }]
+        series: [{ name: 'PSS', type: 'line', smooth: true, showSymbol: false, triggerLineEvent: true, areaStyle: {}, data: p.pss.y, itemStyle: { color: '#1677ff' }, markLine: buildLowMemoryMarkLine() }]
+      };
+    }
+    if (type === 'cpufreq' && p.hardware && p.hardware.x && p.hardware.x.length) {
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 60, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.hardware.x, name: '帧' },
+        yAxis: { type: 'value', name: 'MHz' },
+        dataZoom: baseZoom(),
+        series: [{ name: 'CPU频率', type: 'line', smooth: true, showSymbol: false, data: p.hardware.cpuFreq, itemStyle: { color: '#722ed1' } }]
+      };
+    }
+    if (type === 'netrecv' && p.hardware && p.hardware.x && p.hardware.x.length) {
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 60, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.hardware.x, name: '帧' },
+        yAxis: { type: 'value', name: 'KB' },
+        dataZoom: baseZoom(),
+        series: [{ name: '网络下载', type: 'line', smooth: true, showSymbol: false, areaStyle: { opacity: 0.2 }, data: p.hardware.netRecv, itemStyle: { color: '#13c2c2' } }]
+      };
+    }
+    if (type === 'netsent' && p.hardware && p.hardware.x && p.hardware.x.length) {
+      return {
+        tooltip: tooltipBase,
+        grid: { left: 60, right: 20, top: 30, bottom: 50 },
+        xAxis: { type: 'category', data: p.hardware.x, name: '帧' },
+        yAxis: { type: 'value', name: 'KB' },
+        dataZoom: baseZoom(),
+        series: [{ name: '网络上传', type: 'line', smooth: true, showSymbol: false, areaStyle: { opacity: 0.2 }, data: p.hardware.netSent, itemStyle: { color: '#fa8c16' } }]
       };
     }
     if (type === 'render-dc' && p.render && p.render.x) {
@@ -666,6 +696,18 @@
           return { name: row.label, value: row.averageMs, itemStyle: { color: row.color } };
         })
       }]
+    };
+  }
+
+  function buildLowMemoryMarkLine() {
+    var frames = window.chartPayload && chartPayload.lowMemoryFrames;
+    if (!frames || !frames.length) return undefined;
+    return {
+      silent: true,
+      symbol: 'none',
+      label: { formatter: 'low memory', color: '#ff4d4f', fontSize: 10 },
+      lineStyle: { color: '#ff4d4f', type: 'dashed' },
+      data: frames.map(function (frame) { return { xAxis: String(frame) }; })
     };
   }
 
@@ -1259,6 +1301,7 @@
 
     function classify(line) {
       if (/\[Exception\]/i.test(line)) return 'exception';
+      if (/\[Assert\]/i.test(line)) return 'assert';
       if (/\[Error\]/i.test(line)) return 'error';
       if (/\[Warning\]/i.test(line)) return 'warning';
       if (/\[Log\]/i.test(line)) return 'log';
@@ -1275,7 +1318,7 @@
     function lineClass(line) {
       var kind = classify(line);
       if (kind === 'error' || kind === 'exception') return 'log-line log-error';
-      if (kind === 'warning') return 'log-line log-warning';
+      if (kind === 'warning' || kind === 'assert') return 'log-line log-warning';
       return 'log-line log-info';
     }
 
@@ -1300,7 +1343,174 @@
 
     var moreBtn = document.getElementById('logMore');
     if (moreBtn) moreBtn.onclick = appendLines;
+
+    var stackBox = document.getElementById('logStackBox');
+    if (stackBox) {
+      box.addEventListener('click', function (event) {
+        var lineEl = event.target.closest('.log-line');
+        if (!lineEl) return;
+        box.querySelectorAll('.log-line.selected').forEach(function (x) { x.classList.remove('selected'); });
+        lineEl.classList.add('selected');
+        var text = lineEl.textContent || '';
+        var stackStart = text.search(/\bat\s+\S+|\n\s*UnityEngine\./);
+        stackBox.classList.remove('muted');
+        if (stackStart > 0) {
+          stackBox.textContent = text.slice(stackStart);
+        } else {
+          stackBox.textContent = text + '\n\n（该日志行未携带堆栈信息，需 Unity 端在上传时附带 StackTrace，详见 todo.md）';
+        }
+      });
+    }
+
+    var exportBtn = document.getElementById('logExport');
+    if (exportBtn) {
+      exportBtn.onclick = function () {
+        downloadTextFile(filtered.join('\n'), 'uprofiler-log-' + filter + '.txt', 'text/plain');
+      };
+    }
+
     applyFilter();
+  }
+
+  function downloadTextFile(content, filename, mime) {
+    var blob = new Blob(['\ufeff' + content], { type: (mime || 'text/plain') + ';charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  var icicleColors = ['#1677ff', '#13c2c2', '#52c41a', '#fa8c16', '#722ed1', '#eb2f96', '#2f54eb', '#a0d911', '#fa541c', '#08979c'];
+
+  function renderIcicle(container, title, functions) {
+    if (!functions || !functions.length) {
+      container.innerHTML = '<div class="chart-loading">暂无堆栈数据</div>';
+      return;
+    }
+    var sorted = functions.slice().sort(function (a, b) { return (b.totalPct || 0) - (a.totalPct || 0); }).slice(0, 12);
+    var totalPct = sorted.reduce(function (sum, f) { return sum + (f.totalPct || 0); }, 0);
+    var scale = totalPct > 100 ? 100 / totalPct : 1;
+
+    var html = '<div class="icicle-wrap">';
+    html += '<div class="icicle-row"><div class="icicle-seg icicle-root" style="width:100%" title="' +
+      escapeHtml(title) + ' 100%">' + escapeHtml(title) + ' · 100%</div></div>';
+    html += '<div class="icicle-row">';
+    var used = 0;
+    sorted.forEach(function (func, index) {
+      var pct = Math.max(0.5, (func.totalPct || 0) * scale);
+      used += pct;
+      var label = func.name + ' ' + (func.totalPct || 0).toFixed(2) + '%';
+      html += '<div class="icicle-seg" style="width:' + pct.toFixed(2) + '%;background:' + icicleColors[index % icicleColors.length] +
+        '" title="' + escapeHtml(label) + '" data-func-name="' + escapeHtml(func.name) + '"><span>' + escapeHtml(func.name) + '</span></div>';
+    });
+    if (used < 99.5) {
+      html += '<div class="icicle-seg icicle-other" style="width:' + (100 - used).toFixed(2) + '%" title="其他 ' + (100 - used).toFixed(2) + '%"><span>其他</span></div>';
+    }
+    html += '</div>';
+    html += '<div class="icicle-row icicle-self-row">';
+    sorted.forEach(function (func, index) {
+      var pct = Math.max(0.5, (func.totalPct || 0) * scale);
+      var selfRatio = func.totalPct > 0 ? Math.min(1, (func.selfPct || 0) / func.totalPct) : 0;
+      html += '<div class="icicle-seg icicle-self" style="width:' + pct.toFixed(2) + '%" title="' +
+        escapeHtml(func.name + ' 自身 ' + (func.selfPct || 0).toFixed(2) + '%') + '">' +
+        '<div class="icicle-self-fill" style="width:' + (selfRatio * 100).toFixed(1) + '%;background:' + icicleColors[index % icicleColors.length] + '"></div></div>';
+    });
+    html += '</div></div>';
+    container.innerHTML = html;
+
+    container.querySelectorAll('.icicle-seg[data-func-name]').forEach(function (seg) {
+      seg.onclick = function () {
+        var name = seg.dataset.funcName;
+        var table = container.closest('.thread-tab-panel, .report-panel');
+        if (!table) return;
+        var row = Array.prototype.find.call(table.querySelectorAll('tbody tr'), function (tr) {
+          return tr.textContent.indexOf(name) >= 0;
+        });
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.classList.add('row-highlight');
+          setTimeout(function () { row.classList.remove('row-highlight'); }, 1600);
+        }
+      };
+    });
+  }
+
+  function initIcicleCharts() {
+    document.querySelectorAll('[data-module-icicle]').forEach(function (el) {
+      var key = el.dataset.moduleIcicle;
+      var stack = window.moduleFuncStacks && moduleFuncStacks[key];
+      renderIcicle(el, (stack && stack.title) || key, stack ? stack.functions : null);
+    });
+    document.querySelectorAll('[data-thread-icicle]').forEach(function (el) {
+      var name = el.dataset.threadIcicle;
+      var thread = window.threadStackPayload && threadStackPayload.threads
+        ? threadStackPayload.threads.find(function (t) { return t.name === name; })
+        : null;
+      renderIcicle(el, name, thread ? thread.functions : null);
+    });
+  }
+
+  function initResourceEventDetails() {
+    document.querySelectorAll('.resource-events-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        var section = btn.closest('.report-panel');
+        if (!section) return;
+        var details = section.querySelector('.resource-event-details');
+        if (!details) return;
+        details.open = true;
+        var key = btn.dataset.resKey;
+        var matched = null;
+        details.querySelectorAll('tbody tr').forEach(function (tr) {
+          var hit = tr.dataset.resRow === key;
+          tr.classList.toggle('row-dim', !hit);
+          if (hit && !matched) matched = tr;
+        });
+        if (matched) matched.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
+    });
+  }
+
+  function initReportDownload() {
+    var btn = document.getElementById('reportDownloadJson');
+    if (!btn) return;
+    btn.onclick = function () {
+      var payload = {
+        exportedAt: new Date().toISOString(),
+        chartPayload: window.chartPayload || null,
+        modulePayload: window.modulePayload || null,
+        moduleDetails: window.moduleDetails || null,
+        scenePayload: window.scenePayload || null,
+        diagnosisItems: window.diagnosisItems || null,
+        gpuBandwidthPayload: window.gpuBandwidthPayload || null,
+        resourceSummary: window.resourceSummary || null,
+        moduleFuncStacks: window.moduleFuncStacks || null
+      };
+      downloadTextFile(JSON.stringify(payload, null, 2), 'uprofiler-report.json', 'application/json');
+    };
+  }
+
+  function initTableExports() {
+    document.querySelectorAll('[data-export-table]').forEach(function (btn) {
+      btn.onclick = function () {
+        var section = btn.closest('.panel-section') || document;
+        var table = section.querySelector('table');
+        if (!table) return;
+        var rows = [];
+        table.querySelectorAll('tr').forEach(function (tr) {
+          var cells = [];
+          tr.querySelectorAll('th,td').forEach(function (cell) {
+            var text = (cell.textContent || '').trim().replace(/\s+/g, ' ');
+            cells.push('"' + text.replace(/"/g, '""') + '"');
+          });
+          if (cells.length) rows.push(cells.join(','));
+        });
+        downloadTextFile(rows.join('\n'), (btn.dataset.exportTable || 'table') + '.csv', 'text/csv');
+      };
+    });
   }
 
   function updateSceneFrameHint(frameIndex) {
@@ -1544,5 +1754,9 @@
     initMetricDragSort();
     initFuncSearch();
     initModuleNavigation();
+    initIcicleCharts();
+    initReportDownload();
+    initTableExports();
+    initResourceEventDetails();
   });
 })();

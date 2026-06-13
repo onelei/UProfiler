@@ -7,7 +7,7 @@ namespace LemonFramework.UProfiler.Core
         const string ResourceName = "UProfilerSettings";
 
         [Tooltip("Enable IL-injected function hook profiling. Turn off when running performance tests that should exclude hook overhead.")]
-        public bool enableFunctionHook;
+        public bool enableFunctionHook = true;
 
         [Tooltip("After script compile, auto inject [FunctionAnalysis] methods into Assembly-CSharp.dll.")]
         public bool autoInjectFunctionAnalysisOnCompile = true;

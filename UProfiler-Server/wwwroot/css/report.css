@@ -226,3 +226,31 @@ body > .layout { min-height:calc(100vh - 56px); }
 .scope-chip { font-size:12px; padding:4px 10px; border-radius:999px; background:#f5f5f5; border:1px dashed #d9d9d9; cursor:pointer; }
 .uwa-metric-card.dragging { opacity:.6; }
 .module-icicle-chart, .thread-icicle-chart { min-height:180px; }
+
+.toolbar-badge { font-size:12px; padding:2px 10px; border-radius:999px; background:#e6f4ff; color:var(--blue); margin-right:6px; }
+
+.low-memory-banner { background:#fff1f0; border:1px solid #ffccc7; color:#cf1322; border-radius:8px; padding:10px 14px; font-size:13px; margin:12px 0; }
+
+.log-stack-box { background:#fafafa; border:1px solid #eef2f7; border-radius:8px; padding:12px 14px; font-family:Consolas,Menlo,monospace; font-size:12px; white-space:pre-wrap; word-break:break-all; min-height:64px; max-height:240px; overflow:auto; }
+.log-line { cursor:pointer; }
+.log-line.selected { background:#e6f4ff; }
+
+.icicle-wrap { display:flex; flex-direction:column; gap:2px; padding:8px 0; }
+.icicle-row { display:flex; gap:2px; width:100%; }
+.icicle-seg { height:34px; border-radius:3px; overflow:hidden; white-space:nowrap; font-size:11px; color:#fff; display:flex; align-items:center; padding:0 6px; cursor:pointer; box-sizing:border-box; }
+.icicle-seg span { overflow:hidden; text-overflow:ellipsis; }
+.icicle-root { background:#34495e; cursor:default; }
+.icicle-other { background:#d9d9d9; color:#666; cursor:default; }
+.icicle-self-row .icicle-seg { height:14px; background:#f0f0f0; padding:0; cursor:default; }
+.icicle-self-fill { height:100%; opacity:.65; }
+
+.resource-api-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:12px 0 16px; }
+.resource-api-freq { font-size:13px; color:var(--muted); margin-right:6px; }
+.resource-api-chip { font-size:12px; padding:4px 12px; border-radius:999px; background:#f5f5f5; border:1px solid #e8e8e8; }
+.resource-api-chip b { color:var(--blue); margin-left:2px; }
+.resource-path-cell { max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.resource-event-details { margin-top:16px; }
+.resource-event-details summary { margin-bottom:8px; }
+
+tr.row-highlight td { background:#fff7e6 !important; transition:background .3s; }
+tr.row-dim { opacity:.35; }

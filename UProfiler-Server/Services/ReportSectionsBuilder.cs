@@ -127,6 +127,26 @@ public static class ReportSectionsBuilder
                 $"峰值 · 变化量 {TempDelta(data)} ℃", "basicTempChart", "temperature"));
         }
 
+        if (data.HardwareInfo?.Samples.Count > 0)
+        {
+            var hw = data.HardwareInfo.Samples;
+            var avgFreq = hw.Average(item => item.CpuFreqMHz);
+            var maxFreq = hw.Max(item => item.CpuFreqMHz);
+            var maxFreqFrame = hw.OrderByDescending(item => item.CpuFreqMHz).First().FrameIndex;
+            sb.Append(MetricCard("CPU频率", avgFreq.ToString("F2", CultureInfo.InvariantCulture), "MHz",
+                $"均值 · 最大值：{maxFreq:F2}MHz (第{maxFreqFrame}帧)", "basicCpuFreqChart", "cpufreq"));
+
+            var peakRecv = hw.Max(item => item.NetRecvKB);
+            var peakRecvFrame = hw.OrderByDescending(item => item.NetRecvKB).First().FrameIndex;
+            sb.Append(MetricCard("网络下载", peakRecv.ToString("F2", CultureInfo.InvariantCulture), "KB",
+                $"峰值 (第{peakRecvFrame}帧)", "basicNetRecvChart", "netrecv"));
+
+            var peakSent = hw.Max(item => item.NetSentKB);
+            var peakSentFrame = hw.OrderByDescending(item => item.NetSentKB).First().FrameIndex;
+            sb.Append(MetricCard("网络上传", peakSent.ToString("F2", CultureInfo.InvariantCulture), "KB",
+                $"峰值 (第{peakSentFrame}帧)", "basicNetSentChart", "netsent"));
+        }
+
         sb.Append("</div>");
         sb.Append("<div class=\"info-grid\" style=\"margin-top:20px\">");
         sb.Append("<div class=\"info-card\"><h3>测试信息</h3><table>");
@@ -353,8 +373,11 @@ public static class ReportSectionsBuilder
         sb.Append("<div class=\"jank-summary-grid\">");
         sb.Append(JankSummaryCard("全部卡顿帧", j.JankCount, 100));
         sb.Append(JankSummaryCard("严重卡顿帧", j.SevereJankCount, Math.Round(j.SevereJankCount * 100.0 / total, 2)));
-        sb.Append(JankSummaryCard("GC.Collect类卡顿帧", 0, 0));
+        sb.Append(JankSummaryCard("GC.Collect类卡顿帧", j.GcJankCount, Math.Round(j.GcJankCount * 100.0 / total, 2)));
+        sb.Append(JankSummaryCard("Unload Unused卡顿帧", j.UnloadJankCount, Math.Round(j.UnloadJankCount * 100.0 / total, 2)));
         sb.Append(JankSummaryCard("加载类卡顿帧", j.LoadingJankCount, Math.Round(j.LoadingJankCount * 100.0 / total, 2)));
+        sb.Append(JankSummaryCard("动画类卡顿帧", j.AnimationJankCount, Math.Round(j.AnimationJankCount * 100.0 / total, 2)));
+        sb.Append(JankSummaryCard("物理类卡顿帧", j.PhysicsJankCount, Math.Round(j.PhysicsJankCount * 100.0 / total, 2)));
         sb.Append(JankSummaryCard("其他类卡顿帧", j.OtherJankCount, Math.Round(j.OtherJankCount * 100.0 / total, 2)));
         sb.Append("</div>");
         sb.Append("<div class=\"chart-card\"><div class=\"chart-head\">卡顿帧分布（帧耗时）</div>");
@@ -465,6 +488,17 @@ public static class ReportSectionsBuilder
         sb.Append(" · Reserved Total峰值： ").Append(WebUtility.HtmlEncode(peakTotal));
         sb.Append(" · Reserved Mono峰值： ").Append(WebUtility.HtmlEncode(peakMono));
         sb.Append("</div>");
+
+        var lowMemFrames = data.HardwareInfo?.Samples.Where(item => item.LowMemory).Select(item => item.FrameIndex).ToList();
+        if (lowMemFrames?.Count > 0)
+        {
+            sb.Append("<div class=\"low-memory-banner\">low memory 事件 ")
+                .Append(lowMemFrames.Count)
+                .Append(" 次（帧：")
+                .Append(string.Join("、", lowMemFrames.Take(10)))
+                .Append(lowMemFrames.Count > 10 ? " …" : "")
+                .Append("）。App 前台运行遇到内存压力，对应 Android onLowMemory()/onTrimMemory 或 iOS didReceiveMemoryWarning。</div>");
+        }
         sb.Append("""
 <div class="chart-grid">
 <div class="chart-card"><div class="chart-head">PSS内存占用 / Unity 内存</div><div id="memOccupyChart" class="chart" data-chart="memory"></div></div>
@@ -831,18 +865,28 @@ public static class ReportSectionsBuilder
         sb.Append("<div class=\"section-title\">资源管理 · 资源管理汇总</div>");
         sb.Append("<div class=\"scope-toolbar resource-scope\"><span class=\"scope-label\">总览</span>");
         sb.Append("<span class=\"scope-chip scope-frame-btn\">指定帧</span><span class=\"scope-chip scope-scene-btn\">指定场景</span></div>");
+        var maxFrameForRes = Math.Max(1, MaxFrame(data));
+        var abEvents = rm?.AssetBundle ?? new List<ResourceManagementEventDto>();
+        var abLoadCount = abEvents.Count(evt => evt.Action.Contains("Load", StringComparison.OrdinalIgnoreCase));
+        var abUnloadCount = abEvents.Count(evt => evt.Action.Contains("Unload", StringComparison.OrdinalIgnoreCase));
+
         sb.Append("<div class=\"cards\">");
+        sb.Append(ResourceKpi("AssetBundle总加载次数", abLoadCount > 0 ? abLoadCount : null));
+        sb.Append(ResourceKpi("AssetBundle千帧加载次数", abLoadCount > 0 ? Math.Round(abLoadCount * 1000.0 / maxFrameForRes, 1) : null));
+        sb.Append(ResourceKpi("AssetBundle总卸载次数", abUnloadCount > 0 ? abUnloadCount : null));
+        sb.Append(ResourceKpi("AssetBundle千帧卸载次数", abUnloadCount > 0 ? Math.Round(abUnloadCount * 1000.0 / maxFrameForRes, 1) : null));
         sb.Append(ResourceKpi("Resources.Load千帧调用次数", rm?.ResourcesLoadPer1k));
-        sb.Append(ResourceKpi("AssetBundle.Load千帧调用次数", rm?.AbLoadPer1k));
         sb.Append(ResourceKpi("Instantiate千帧调用次数", rm?.InstantiatePer1k));
         sb.Append(ResourceKpi("Activate千帧调用次数", rm?.ActivatePer1k));
         sb.Append("</div>");
 
         sb.Append("<div class=\"resource-top-grid\">");
         sb.Append(ResourceTopTable("AssetBundle 加载次数 TOP 10", new[] { "AB路径", "加载方式", "加载次数" }, BuildTopRows(rm?.AbLoadTop)));
+        sb.Append(ResourceTopTable("AssetBundle 卸载次数 TOP 10", new[] { "AB名称", "卸载方式", "卸载次数" }, BuildTopRows(rm?.UnloadTop)));
         sb.Append(ResourceTopTable("资源加载次数 TOP 10", new[] { "资源路径", "加载方式", "加载次数" }, BuildTopRows(rm?.ResourceLoadTop)));
-        sb.Append(ResourceTopTable("Instantiate 调用次数 TOP 10", new[] { "资源名称", "调用次数" }, BuildInstantiateRows(rm?.InstantiateTop)));
-        sb.Append(ResourceTopTable("卸载次数 TOP 10", new[] { "资源路径", "卸载方式", "卸载次数" }, BuildTopRows(rm?.UnloadTop)));
+        sb.Append(ResourceTopTable("资源加载耗时 TOP 10", new[] { "资源路径", "加载方式", "耗时(ms)" }, BuildDurationTopRows(rm?.Resource, rm?.AssetBundle)));
+        sb.Append(ResourceTopTable("资源实例化次数 TOP 10", new[] { "资源名称", "调用次数" }, BuildInstantiateRows(rm?.InstantiateTop)));
+        sb.Append(ResourceTopTable("资源实例化耗时 TOP 10", new[] { "资源名称", "耗时(ms)" }, BuildInstantiateDurationRows(rm?.Instantiate)));
         sb.Append("</div>");
 
         if (data.ResourceSummary.Count > 0)
@@ -862,9 +906,12 @@ public static class ReportSectionsBuilder
 
         sb.Append("</section>");
 
-        sb.Append(BuildResourceEventSection("resource-ab", "AssetBundle 加载&amp;卸载", rm?.AssetBundle));
-        sb.Append(BuildResourceEventSection("resource-load", "资源加载&amp;卸载", rm?.Resource));
-        sb.Append(BuildResourceEventSection("resource-instantiate", "资源实例化&amp;激活", rm?.Instantiate));
+        sb.Append(BuildResourceEventSection(data, "resource-ab", "AssetBundle 加载&amp;卸载", rm?.AssetBundle,
+            new[] { "AssetBundle.LoadFromFile", "AssetBundle.LoadFromMemory", "AssetBundle.Unload", "AssetBundle.LoadFromStream" }, "AssetBundle路径"));
+        sb.Append(BuildResourceEventSection(data, "resource-load", "资源加载&amp;卸载", rm?.Resource,
+            new[] { "Resources.Load", "AssetBundle.LoadAsset", "Resources.UnloadAsset" }, "资源路径"));
+        sb.Append(BuildResourceEventSection(data, "resource-instantiate", "资源实例化&amp;激活", rm?.Instantiate,
+            new[] { "Object.Instantiate", "Object.Destroy", "GameObject.SetActive" }, "资源名称"));
         return sb.ToString();
     }
 
@@ -895,6 +942,54 @@ public static class ReportSectionsBuilder
         return sb.ToString();
     }
 
+    static string BuildDurationTopRows(
+        IReadOnlyList<ResourceManagementEventDto>? resourceEvents,
+        IReadOnlyList<ResourceManagementEventDto>? abEvents)
+    {
+        var all = new List<ResourceManagementEventDto>();
+        if (resourceEvents != null) all.AddRange(resourceEvents);
+        if (abEvents != null) all.AddRange(abEvents.Where(evt => evt.Action.Contains("LoadAsset", StringComparison.OrdinalIgnoreCase)));
+        if (all.Count == 0)
+        {
+            return EmptyResourceRow();
+        }
+
+        var sb = new StringBuilder();
+        foreach (var g in all
+                     .GroupBy(evt => (Key: string.IsNullOrWhiteSpace(evt.Path) ? evt.Name : evt.Path, evt.Action))
+                     .Select(g => new { g.Key.Key, g.Key.Action, TotalMs = g.Sum(evt => evt.DurationMs) })
+                     .OrderByDescending(item => item.TotalMs)
+                     .Take(10))
+        {
+            sb.Append("<tr><td>").Append(WebUtility.HtmlEncode(g.Key)).Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(g.Action)).Append("</td><td>")
+                .Append(g.TotalMs.ToString("F2", CultureInfo.InvariantCulture)).Append("</td></tr>");
+        }
+
+        return sb.ToString();
+    }
+
+    static string BuildInstantiateDurationRows(IReadOnlyList<ResourceManagementEventDto>? events)
+    {
+        if (events == null || events.Count == 0)
+        {
+            return "<tr><td colspan=\"2\" class=\"muted\">在测试过程中未发生/未检测到该数据</td></tr>";
+        }
+
+        var sb = new StringBuilder();
+        foreach (var g in events
+                     .GroupBy(evt => string.IsNullOrWhiteSpace(evt.Name) ? evt.Path : evt.Name)
+                     .Select(g => new { Key = g.Key, TotalMs = g.Sum(evt => evt.DurationMs) })
+                     .OrderByDescending(item => item.TotalMs)
+                     .Take(10))
+        {
+            sb.Append("<tr><td>").Append(WebUtility.HtmlEncode(g.Key)).Append("</td><td>")
+                .Append(g.TotalMs.ToString("F2", CultureInfo.InvariantCulture)).Append("</td></tr>");
+        }
+
+        return sb.ToString();
+    }
+
     static string BuildInstantiateRows(IReadOnlyList<ResourceManagementTopDto>? rows)
     {
         if (rows == null || rows.Count == 0)
@@ -912,31 +1007,87 @@ public static class ReportSectionsBuilder
         return sb.ToString();
     }
 
-    static string BuildResourceEventSection(string id, string title, IReadOnlyList<ResourceManagementEventDto>? events)
+    static string BuildResourceEventSection(
+        ReportDataContext data,
+        string id,
+        string title,
+        IReadOnlyList<ResourceManagementEventDto>? events,
+        string[] apiNames,
+        string pathHeader)
     {
         var sb = new StringBuilder();
         sb.Append("<section id=\"").Append(id).Append("\" class=\"section report-panel\" data-panel=\"").Append(id).Append("\">");
         sb.Append("<div class=\"section-title\">资源管理 · ").Append(title).Append("</div>");
         sb.Append("<div class=\"scope-toolbar resource-scope\"><span class=\"scope-label\">总览</span>");
-        sb.Append("<span class=\"scope-chip scope-frame-btn\">指定帧</span><button type=\"button\" class=\"link-btn resource-export-btn\" disabled>导出</button></div>");
-        sb.Append("<table class=\"data-table\"><thead><tr><th>帧</th><th>场景</th><th>动作</th><th>路径/名称</th><th>耗时(ms)</th></tr></thead><tbody>");
-        if (events == null || events.Count == 0)
+        sb.Append("<span class=\"scope-chip scope-frame-btn\">指定帧</span>");
+        sb.Append("<button type=\"button\" class=\"link-btn resource-export-btn\" data-export-table=\"").Append(id).Append("\">导出CSV</button></div>");
+
+        var eventList = events ?? new List<ResourceManagementEventDto>();
+        var maxFrame = Math.Max(1, MaxFrame(data));
+        var per1k = Math.Round(eventList.Count * 1000.0 / maxFrame, 2);
+
+        // 接口统计条（对照 UWA：各接口调用次数 + 千帧调用频率）
+        sb.Append("<div class=\"resource-api-bar\">");
+        sb.Append("<span class=\"resource-api-freq\">调用频率 <b>").Append(per1k.ToString(CultureInfo.InvariantCulture)).Append("</b> 次/千帧</span>");
+        foreach (var api in apiNames)
         {
-            sb.Append("<tr><td colspan=\"5\" class=\"muted\">该细分项需 Unity 上传 <code>resourceManagement_</code> 事件流（见 todo.md）。</td></tr>");
-        }
-        else
-        {
-            foreach (var evt in events.Take(500))
-            {
-                sb.Append("<tr><td>").Append(evt.Frame).Append("</td><td>")
-                    .Append(WebUtility.HtmlEncode(evt.Scene)).Append("</td><td>")
-                    .Append(WebUtility.HtmlEncode(evt.Action)).Append("</td><td>")
-                    .Append(WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(evt.Path) ? evt.Name : evt.Path)).Append("</td><td>")
-                    .Append(evt.DurationMs.ToString("F2", CultureInfo.InvariantCulture)).Append("</td></tr>");
-            }
+            var count = eventList.Count(evt => evt.Action.Contains(api, StringComparison.OrdinalIgnoreCase)
+                || api.Contains(evt.Action, StringComparison.OrdinalIgnoreCase));
+            sb.Append("<span class=\"resource-api-chip\">").Append(WebUtility.HtmlEncode(api))
+                .Append(" <b>").Append(count).Append("</b></span>");
         }
 
-        sb.Append("</tbody></table></section>");
+        sb.Append("</div>");
+
+        if (eventList.Count == 0)
+        {
+            sb.Append("<p class=\"muted\">该细分项需 Unity 上传 <code>resourceManagement_</code> 事件流（见 todo.md）。</p></section>");
+            return sb.ToString();
+        }
+
+        // 资源聚合表（对照 UWA「具体资源使用情况」：路径 / 接口 / 调用次数 / 耗时）
+        var grouped = eventList
+            .GroupBy(evt => (Key: string.IsNullOrWhiteSpace(evt.Path) ? evt.Name : evt.Path, evt.Action))
+            .Select(g => new
+            {
+                g.Key.Key,
+                g.Key.Action,
+                Count = g.Count(),
+                TotalMs = g.Sum(evt => evt.DurationMs)
+            })
+            .OrderByDescending(item => item.TotalMs)
+            .Take(100)
+            .ToList();
+
+        sb.Append("<div class=\"table-toolbar\"><span class=\"chart-head\" style=\"border:none;padding:0\">具体资源使用情况（所有资源）</span></div>");
+        sb.Append("<table class=\"data-table\"><thead><tr><th>").Append(WebUtility.HtmlEncode(pathHeader))
+            .Append("</th><th>调用接口</th><th>调用次数</th><th>耗时(ms)</th><th>操作</th></tr></thead><tbody>");
+        foreach (var row in grouped)
+        {
+            sb.Append("<tr><td class=\"resource-path-cell\">").Append(WebUtility.HtmlEncode(row.Key)).Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(row.Action)).Append("</td><td>")
+                .Append(row.Count).Append("</td><td>")
+                .Append(row.TotalMs.ToString("F2", CultureInfo.InvariantCulture)).Append("</td><td>")
+                .Append("<button type=\"button\" class=\"link-btn resource-events-btn\" data-res-key=\"")
+                .Append(WebUtility.HtmlEncode(row.Key)).Append("\">调用明细</button></td></tr>");
+        }
+
+        sb.Append("</tbody></table>");
+
+        // 事件流明细（默认折叠）
+        sb.Append("<details class=\"resource-event-details\"><summary class=\"chart-head\" style=\"cursor:pointer\">事件流明细（前 500 条）</summary>");
+        sb.Append("<table class=\"data-table\"><thead><tr><th>帧</th><th>场景</th><th>动作</th><th>路径/名称</th><th>耗时(ms)</th></tr></thead><tbody>");
+        foreach (var evt in eventList.Take(500))
+        {
+            sb.Append("<tr data-res-row=\"").Append(WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(evt.Path) ? evt.Name : evt.Path))
+                .Append("\"><td>").Append(evt.Frame).Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(evt.Scene)).Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(evt.Action)).Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(evt.Path) ? evt.Name : evt.Path)).Append("</td><td>")
+                .Append(evt.DurationMs.ToString("F2", CultureInfo.InvariantCulture)).Append("</td></tr>");
+        }
+
+        sb.Append("</tbody></table></details></section>");
         return sb.ToString();
     }
 
@@ -957,11 +1108,14 @@ public static class ReportSectionsBuilder
 <button type="button" class="log-filter-btn" data-log-filter="warning">Warning ({counts.Warning})</button>
 <button type="button" class="log-filter-btn" data-log-filter="error">Error ({counts.Error})</button>
 <button type="button" class="log-filter-btn" data-log-filter="exception">Exception ({counts.Exception})</button>
-<button type="button" class="link-btn" id="logExport" disabled>导出Log</button>
+<button type="button" class="log-filter-btn" data-log-filter="assert">Assert ({counts.Assert})</button>
+<button type="button" class="link-btn" id="logExport">导出Log</button>
 </div>
 <div class="table-toolbar"><span class="muted">帧数 · 场景 · Log内容 · 共 {data.LogLines.Count} 条</span>
 <button id="logMore" type="button" class="link-btn">加载更多</button></div>
 <div id="logBox" class="log-box log-table"></div>
+<div class="table-toolbar" style="margin-top:14px"><span class="chart-head" style="border:none;padding:0">堆栈信息</span></div>
+<div id="logStackBox" class="log-stack-box muted">点击上方日志行查看堆栈信息。</div>
 <script type="application/json" id="logData">{logJson}</script>
 </section>
 """;
@@ -1112,21 +1266,23 @@ public static class ReportSectionsBuilder
         sb.Append("</td></tr>");
     }
 
-    static (int All, int Log, int Warning, int Error, int Exception) CountLogLevels(List<string> lines)
+    static (int All, int Log, int Warning, int Error, int Exception, int Assert) CountLogLevels(List<string> lines)
     {
         var log = 0;
         var warning = 0;
         var error = 0;
         var exception = 0;
+        var assert = 0;
         foreach (var line in lines)
         {
             if (line.Contains("[Exception]", StringComparison.OrdinalIgnoreCase)) exception++;
+            else if (line.Contains("[Assert]", StringComparison.OrdinalIgnoreCase)) assert++;
             else if (line.Contains("[Error]", StringComparison.OrdinalIgnoreCase)) error++;
             else if (line.Contains("[Warning]", StringComparison.OrdinalIgnoreCase)) warning++;
             else if (line.Contains("[Log]", StringComparison.OrdinalIgnoreCase)) log++;
         }
 
-        return (lines.Count, log, warning, error, exception);
+        return (lines.Count, log, warning, error, exception, assert);
     }
 
     static bool HasPowerData(ReportDataContext data)

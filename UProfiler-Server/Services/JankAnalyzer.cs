@@ -56,9 +56,17 @@ public static class JankAnalyzer
 
         var jankHotFunctions = BuildJankHotFunctions(data.FuncAnalysis, jankFrames.Count);
         var severeCount = jankFrames.Count(item => item.JankType == "BigJank");
-        var loadingCount = jankHotFunctions.Count(item =>
-            item.Name.Contains("Load", StringComparison.OrdinalIgnoreCase)
-            || item.Name.Contains("Preload", StringComparison.OrdinalIgnoreCase));
+
+        int CountByKeywords(params string[] keywords) => Math.Min(
+            jankFrames.Count,
+            jankHotFunctions.Count(item =>
+                keywords.Any(k => item.Name.Contains(k, StringComparison.OrdinalIgnoreCase))));
+
+        var loadingCount = CountByKeywords("Load", "Preload");
+        var gcCount = CountByKeywords("GC.Collect", "GarbageCollect");
+        var unloadCount = CountByKeywords("UnloadUnused", "Resources.UnloadUnusedAssets");
+        var animationCount = CountByKeywords("Animator", "Animation", "MeshSkinning");
+        var physicsCount = CountByKeywords("Physics", "Rigidbody", "FixedUpdate");
         var otherCount = Math.Max(0, jankFrames.Count - loadingCount);
 
         return new JankAnalysisPayload
@@ -69,6 +77,10 @@ public static class JankAnalyzer
             SevereJankCount = severeCount,
             LoadingJankCount = Math.Min(loadingCount, jankFrames.Count),
             OtherJankCount = otherCount,
+            GcJankCount = gcCount,
+            UnloadJankCount = unloadCount,
+            AnimationJankCount = animationCount,
+            PhysicsJankCount = physicsCount,
             Frames = jankFrames,
             HotFunctions = hotFuncs,
             JankHotFunctions = jankHotFunctions
@@ -111,6 +123,7 @@ public static class JankAnalyzer
         return
         [
             new JankFuncCategoryPayload { Key = "gc", Label = "GC.Collect卡顿点", Functions = MapCategory(item => item.Name.Contains("GC", StringComparison.OrdinalIgnoreCase)) },
+            new JankFuncCategoryPayload { Key = "unload", Label = "Unload Unused卡顿点", Functions = MapCategory(item => item.Name.Contains("Unload", StringComparison.OrdinalIgnoreCase)) },
             new JankFuncCategoryPayload { Key = "loading", Label = "加载卡顿点", Functions = MapCategory(item => item.Name.Contains("Load", StringComparison.OrdinalIgnoreCase) || item.Name.Contains("Instantiate", StringComparison.OrdinalIgnoreCase)) },
             new JankFuncCategoryPayload { Key = "animation", Label = "动画卡顿点", Functions = MapCategory(item => item.Name.Contains("Animator", StringComparison.OrdinalIgnoreCase) || item.Name.Contains("Animation", StringComparison.OrdinalIgnoreCase)) },
             new JankFuncCategoryPayload { Key = "physics", Label = "物理卡顿点", Functions = MapCategory(item => item.Name.Contains("Physics", StringComparison.OrdinalIgnoreCase) || item.Name.Contains("Rigidbody", StringComparison.OrdinalIgnoreCase)) }

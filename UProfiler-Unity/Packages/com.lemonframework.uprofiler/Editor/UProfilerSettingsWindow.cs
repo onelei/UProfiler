@@ -109,7 +109,7 @@ namespace LemonFramework.UProfiler.Editor
                 Directory.CreateDirectory(directory);
 
             settings = ScriptableObject.CreateInstance<UProfilerSettings>();
-            settings.enableFunctionHook = false;
+            settings.enableFunctionHook = true;
             AssetDatabase.CreateAsset(settings, AssetPath);
             AssetDatabase.SaveAssets();
             UProfilerSettings.InvalidateCache();

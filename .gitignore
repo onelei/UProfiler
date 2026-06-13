@@ -54,5 +54,8 @@ UProfiler-Server/obj/
 Server/
 Unity/
 
+# UWA reference data & crawl artifacts (local only)
+uwa/
+
 # Binaries
 *.apk

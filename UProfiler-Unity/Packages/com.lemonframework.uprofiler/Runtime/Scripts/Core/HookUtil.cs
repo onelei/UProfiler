@@ -180,6 +180,37 @@ namespace LemonFramework.UProfiler.Core
             Debug.Log($"---Hook EndDebugLog:{methodName}");
         }
 
+        public static List<FuncAnalysisInfo> BuildFuncAnalysisList()
+        {
+            var list = new List<FuncAnalysisInfo>();
+            if (!UProfilerSettings.IsFunctionHookEnabled || FunctionDatas.Count <= 0)
+            {
+                return list;
+            }
+
+            using var ge = FunctionDatas.GetEnumerator();
+            while (ge.MoveNext())
+            {
+                var tmp = ge.Current.Value;
+                if (tmp.FuncCalls <= 0)
+                {
+                    continue;
+                }
+
+                list.Add(new FuncAnalysisInfo
+                {
+                    name = tmp.FuncName,
+                    memory = tmp.FuncMemory / 1024.0,
+                    averageMemory = tmp.FuncTotalMemory / (tmp.FuncCalls * 1024.0),
+                    useTime = tmp.FuncTime,
+                    averageTime = tmp.FuncTotalTime / tmp.FuncCalls * 1000,
+                    calls = tmp.FuncCalls
+                });
+            }
+
+            return list;
+        }
+
         public static void PrintMethodDatas()
         {
             if (!UProfilerSettings.IsFunctionHookEnabled)
@@ -222,6 +253,7 @@ namespace LemonFramework.UProfiler.Core
         public static void EndSample() { }
         public static void BeginDebugLog(string methodName) { }
         public static void EndDebugLog(string methodName) { }
+        public static List<FuncAnalysisInfo> BuildFuncAnalysisList() => new List<FuncAnalysisInfo>();
         public static void PrintMethodDatas() { }
 #endif
     }
