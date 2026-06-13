@@ -118,9 +118,15 @@ public static class ReportDataLoader
             SceneManagement = SceneInfoBuilder.Build(enriched)
         };
 
-        var withThread = withScene with
+        var withStacks = withScene with
         {
-            ThreadStack = ThreadStackBuilder.Build(withScene)
+            ModuleFuncStacks = ModuleFuncStackBuilder.Enrich(withScene.ModuleFuncStacks, withScene),
+            LuaMemory = LuaMemoryBuilder.Normalize(withScene.LuaMemory)
+        };
+
+        var withThread = withStacks with
+        {
+            ThreadStack = ThreadStackBuilder.Build(withStacks)
         };
 
         var collapseMetrics = BriefCollapseBuilder.Build(withThread);
@@ -149,7 +155,22 @@ public static class ReportDataLoader
                 var stack = JsonSerializer.Deserialize<ModuleFuncStackDto>(File.ReadAllText(file.SavedPath), JsonOptions);
                 if (stack != null && !string.IsNullOrWhiteSpace(stack.Module))
                 {
-                    result[stack.Module] = stack;
+                    var moduleKey = ModuleFuncStackBuilder.NormalizeModuleKey(stack.Module);
+                    if (!moduleKey.Equals(stack.Module, StringComparison.OrdinalIgnoreCase))
+                    {
+                        stack = new ModuleFuncStackDto
+                        {
+                            Module = moduleKey,
+                            Scope = stack.Scope,
+                            StackMode = stack.StackMode,
+                            Order = stack.Order,
+                            Metrics = stack.Metrics,
+                            Functions = stack.Functions,
+                            AiDiagnosis = stack.AiDiagnosis
+                        };
+                    }
+
+                    result[moduleKey] = stack;
                 }
             }
             catch

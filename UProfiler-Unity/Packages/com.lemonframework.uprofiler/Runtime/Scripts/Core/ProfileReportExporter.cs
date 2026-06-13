@@ -24,7 +24,7 @@ namespace LemonFramework.UProfiler.Core
 
         static readonly string[] ModuleFuncStackKeys =
         {
-            "rendering", "sync", "logic", "ui", "loading", "physics", "animation", "particle"
+            "rendering", "sync", "logic", "ui", "loading", "physics", "animation", "particles"
         };
 
         static readonly Dictionary<string, string> ModuleTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -36,7 +36,7 @@ namespace LemonFramework.UProfiler.Core
             ["loading"] = "加载模块",
             ["physics"] = "物理系统",
             ["animation"] = "动画模块",
-            ["particle"] = "粒子系统"
+            ["particles"] = "粒子系统"
         };
 
         static readonly string[] ThreadNames =
@@ -367,7 +367,7 @@ namespace LemonFramework.UProfiler.Core
 
             if (ContainsAny(name, "Particle", "Shuriken"))
             {
-                return "particle";
+                return "particles";
             }
 
             if (ContainsAny(name, "Wait", "Sync", "Present", "JobHandle"))

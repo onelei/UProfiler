@@ -8,3 +8,4 @@ public static class StaticAssets
     public static string VendorJs(string name) => $"/js/vendor/{name}?v={Version}";
 }
 
+

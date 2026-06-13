@@ -173,31 +173,22 @@ public static class ModulePerfSectionBuilder
             return stack.Functions;
         }
 
-        var totalMs = data.FuncAnalysis.Sum(item => Math.Max(0, item.UseTime * 1000));
-        if (totalMs <= 0)
+        var normalizedKey = ModuleFuncStackBuilder.NormalizeModuleKey(key);
+        if (normalizedKey != key && data.ModuleFuncStacks.TryGetValue(normalizedKey, out stack) && stack.Functions.Count > 0)
         {
-            totalMs = 1;
+            return stack.Functions;
         }
 
-        return data.FuncAnalysis
-            .Take(key == "logic" ? 50 : 20)
-            .Select(item =>
-            {
-                var total = item.UseTime * 1000;
-                return new ModuleFuncStackFunctionRow
-                {
-                    Name = item.Name,
-                    AvgMs = Math.Round(item.AverageTime, 2),
-                    TotalMs = Math.Round(total, 2),
-                    SelfMs = Math.Round(item.AverageTime * 0.12, 2),
-                    TotalPct = Math.Round(total / totalMs * 100, 2),
-                    SelfPct = Math.Round(item.AverageTime / Math.Max(1, item.AverageTime + total) * 100, 2),
-                    CallCount = item.Calls,
-                    CallsPerFrame = Math.Round(item.Calls / Math.Max(1.0, data.Brief.FrameCount / 30.0), 2),
-                    FrameCount = item.Calls
-                };
-            })
-            .ToList();
+        var filtered = ModuleFuncStackBuilder.FilterFunctions(
+            data.FuncAnalysis,
+            key,
+            Math.Max(1, data.Brief.FrameCount));
+        if (filtered.Count > 0)
+        {
+            return filtered;
+        }
+
+        return new List<ModuleFuncStackFunctionRow>();
     }
 
     static List<ModuleFuncStackAiEntry> BuildFallbackAi(ReportDataContext data, string key)

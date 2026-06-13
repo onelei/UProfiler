@@ -1,5 +1,5 @@
 ﻿<p align="right">
-  <img src="https://img.shields.io/badge/version-1.1.1-blue?style=for-the-badge" alt="v1.1.1">
+  <img src="https://img.shields.io/badge/version-1.1.2-blue?style=for-the-badge" alt="v1.1.2">
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新日志-lightgrey?style=for-the-badge" alt="Changelog"></a>
   <img src="https://img.shields.io/badge/lang-简体中文-blue?style=for-the-badge" alt="简体中文">
   <a href="README_EN.md"><img src="https://img.shields.io/badge/lang-English-lightgrey?style=for-the-badge" alt="English"></a>
@@ -326,7 +326,7 @@ Unity (UProfilerHost)
 
 ## 版本与更新日志
 
-当前版本：**1.1.1**（见根目录 `VERSION`）
+当前版本：**1.1.2**（见根目录 `VERSION`）
 
 - 中文更新日志：[CHANGELOG.md](CHANGELOG.md)
 - English changelog: [CHANGELOG_EN.md](CHANGELOG_EN.md)
@@ -343,4 +343,5 @@ Unity (UProfilerHost)
 ## License
 
 待定
+
 

@@ -6,6 +6,34 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-06-13
+
+### Added
+
+- UWA-style report sidebar tabs and split-panel layout (overview, module time, resource management, jank, etc.)
+- Unity extended uploads: `moduleTime_`, `hardwareInfo_`, `threadStack_`, `moduleFuncStack_`, `briefAiDiagnosis_`, `gpuBandwidth_`, `luaMemory_`, `resourceManagement_`
+- `ModuleTimeSampler`: module CPU sampling via Unity ProfilerRecorder
+- `HardwareInfoSampler`: CPU frequency, network traffic, and related hardware metrics
+- `ResourceManagementAutoSampler`: auto-detect GameObject / AssetBundle / asset lifecycle for resource management events
+- `ResourceEventTracker`: manual instrumentation API for Resources / AssetBundle wrappers
+- `LuaMemoryProvider` / `LuaMemoryAutoProbe`: Lua memory collection framework (requires xLua env registration)
+- `CustomDataTracker`: custom dashboard, function groups, variables, and code segments
+- Scene info upload (`sceneInfo_`) and scene management report tab
+- Jank analysis (`JankAnalyzer`) improvements
+
+### Changed
+
+- Server report loading and module function stack enrichment (`funcAnalysis_` / Profiler fallback)
+- Resource management, Lua memory, and module performance sections aligned with UWA-style UI
+- Frame selection guide line hidden from chart legend and tooltip
+- Static asset cache version bumped to `112`
+- UWA reference materials moved to `uwa/` and added to `.gitignore`
+
+### Fixed
+
+- `sceneInfo_` placeholder shown even when data was present
+- Unity `ModuleTimeSampler` Unity 2020.1 compile compatibility, `UProfilerHost` FTP callback, and Android symbol issues
+
 ## [1.1.1] - 2026-06-12
 
 ### Changed
@@ -63,6 +91,7 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 - Android device PSS / power consumption
 - `start.bat` / `stop.bat` scripts
 
+[1.1.2]: https://github.com/lemonframework/UProfiler/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lemonframework/UProfiler/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lemonframework/UProfiler/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/lemonframework/UProfiler/compare/v1.0.1...v1.0.2

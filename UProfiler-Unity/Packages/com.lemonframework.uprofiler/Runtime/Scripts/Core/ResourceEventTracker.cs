@@ -8,7 +8,7 @@ namespace LemonFramework.UProfiler.Core
 {
     /// <summary>
     /// Records resource load/unload/instantiate events for resourceManagement_ upload.
-    /// Call from game code or wrappers around Resources / AssetBundle APIs.
+    /// Auto-detected by ResourceManagementAutoSampler; call manually from Resources / AssetBundle wrappers for precise paths and timing.
     /// </summary>
     public static class ResourceEventTracker
     {

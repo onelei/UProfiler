@@ -6,6 +6,34 @@
 
 ## [未发布]
 
+## [1.1.2] - 2026-06-13
+
+### 新增
+
+- 报告页 UWA 风格左侧页签与右侧分 panel 布局（性能概览、模块耗时、资源管理、卡顿点等）
+- Unity 扩展数据上传：`moduleTime_`、`hardwareInfo_`、`threadStack_`、`moduleFuncStack_`、`briefAiDiagnosis_`、`gpuBandwidth_`、`luaMemory_`、`resourceManagement_`
+- `ModuleTimeSampler`：基于 Unity ProfilerRecorder 的模块耗时采样
+- `HardwareInfoSampler`：CPU 频率、网络流量等硬件信息采样
+- `ResourceManagementAutoSampler`：自动检测 GameObject / AssetBundle / 资源对象生命周期并生成资源管理事件流
+- `ResourceEventTracker`：Resources / AssetBundle 手动埋点 API
+- `LuaMemoryProvider` / `LuaMemoryAutoProbe`：Lua 内存采集框架（xLua 等需注册）
+- `CustomDataTracker`：自定义面板 / 函数组 / 变量 / 代码段数据
+- 场景信息采集（`sceneInfo_`）与报告场景管理页签
+- 卡顿点分析（JankAnalyzer）优化
+
+### 变更
+
+- 服务端报告数据加载与模块函数堆栈补全（`funcAnalysis_` / Profiler 采样降级）
+- 资源管理、Lua 内存、模块性能等报告区块对齐 UWA 展示
+- 图表帧选竖线辅助系列不再出现在图例与 tooltip 中
+- 静态资源缓存版本更新为 `112`
+- UWA 参考材料移至 `uwa/` 并加入 `.gitignore`
+
+### 修复
+
+- `sceneInfo_` 有数据时仍显示「请上传」的提示逻辑
+- Unity 端 `ModuleTimeSampler` Unity 2020.1 编译兼容、`UProfilerHost` FTP 回调与 Android 变量名等问题
+
 ## [1.1.1] - 2026-06-12
 
 ### 变更
@@ -63,6 +91,7 @@
 - Android 真机 PSS / 功耗采集
 - 启动脚本 `start.bat` / `stop.bat`
 
+[1.1.2]: https://github.com/lemonframework/UProfiler/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lemonframework/UProfiler/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lemonframework/UProfiler/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/lemonframework/UProfiler/compare/v1.0.1...v1.0.2

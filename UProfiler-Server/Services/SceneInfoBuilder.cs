@@ -41,13 +41,16 @@ public static class SceneInfoBuilder
         var filteredSegments = hasSceneInfo
             ? segments.Where(segment => segment.EndFrame - segment.StartFrame + 1 >= 100).ToList()
             : segments;
+        var hiddenShortSceneCount = hasSceneInfo ? segments.Count - filteredSegments.Count : 0;
 
         var rows = filteredSegments.Select(segment => BuildSceneRow(segment, data, frameTimes)).ToList();
         var overview = BuildOverviewBars(filteredSegments, data);
 
         return new SceneManagementPayload
         {
-            HasSceneInfo = data.SceneInfo?.Segments.Count > 0,
+            HasSceneInfo = hasSceneInfo,
+            RawSceneCount = segments.Count,
+            HiddenShortSceneCount = hiddenShortSceneCount,
             FrameTimes = frameTimes,
             Scenes = rows,
             OverviewBars = overview.Bars,

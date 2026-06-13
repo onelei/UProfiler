@@ -44,6 +44,15 @@ namespace LemonFramework.UProfiler.Components
         [Header("Use binary file format (.data instead of .txt)")]
         public bool useBinary = false;
 
+        [Header("Lua memory sampling (requires xLua/SLua hook or LuaMemoryProvider)")]
+        public bool enableLuaMemory = true;
+
+        [Header("Resource management event stream (auto-detect + manual ResourceEventTracker)")]
+        public bool enableResourceManagement = true;
+
+        [Header("Delete local record files after all uploads succeed")]
+        public bool deleteLocalFilesAfterUpload = true;
+
         public Text UploadTips;
         public Text ReportUrl;
         int _fps = 0;
@@ -106,11 +115,19 @@ namespace LemonFramework.UProfiler.Components
         SceneInfoData _sceneInfoData = new SceneInfoData();
         ModuleTimeSampler _moduleTimeSampler;
         HardwareInfoSampler _hardwareInfoSampler;
-        readonly List<LuaMemoryUploadData> _luaMemorySnapshots = new List<LuaMemoryUploadData>();
+        ResourceManagementAutoSampler _resourceAutoSampler;
         string _activeSceneName = "";
         int _activeSceneStartFrame = 1;
         //
         string fileExt;
+
+        bool _sessionUploadTracking;
+        bool _reportRegisterPending;
+        bool _reportRegisterOk;
+        int _uploadPendingCount;
+        int _uploadFailedCount;
+        readonly List<string> _sessionFilesToCleanup = new List<string>();
+        readonly HashSet<string> _sessionCleanupSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 #if UNITY_2020_1_OR_NEWER
         private ProfilerRecorder setPassCallRecord;
@@ -216,6 +233,7 @@ namespace LemonFramework.UProfiler.Components
             {
                 Debug.Log(ConstString.uProfilerStop);
                 ShareDatas.EndTime = DateTime.Now;
+                BeginSessionUploadTracking();
                 //
                 UploadTestInfo();
                 //
@@ -227,6 +245,10 @@ namespace LemonFramework.UProfiler.Components
                 UProfilerInfosReport();
                 FrameRateInfosReport();
                 SceneInfoReport();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (enableFunctionAnalysis && UProfilerSettings.IsFunctionHookEnabled)
+                    FuncAnalysisReport();
+#endif
                 ExtendedReportsReport();
 #if UNITY_2020_1_OR_NEWER
                 if (enableRenderInfo)
@@ -234,10 +256,6 @@ namespace LemonFramework.UProfiler.Components
 #endif
                 if (enableResMemoryDistributionInfo)
                     ResMemoryReport();
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                if (enableFunctionAnalysis && UProfilerSettings.IsFunctionHookEnabled)
-                    FuncAnalysisReport();
-#endif
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (enableMobileConsumptionInfo) //
             {
@@ -262,6 +280,8 @@ namespace LemonFramework.UProfiler.Components
                 HttpGet(string.Format(Config.ReportRecordUpdateRequestUrl, Application.identifier, _startTime),
                     (result) =>
                     {
+                        _reportRegisterPending = false;
+                        _reportRegisterOk = result;
                         if (result)
                         {
                             if (ReportUrl != null)
@@ -271,8 +291,92 @@ namespace LemonFramework.UProfiler.Components
                                     $"<a href={string.Format(ShareDatas.ReportUrl, ShareDatas.StartTimeStr)}>{string.Format(ShareDatas.ReportUrl, ShareDatas.StartTimeStr)}</a>";
                             }
                         }
+
+                        TryCleanupSessionFiles();
                     });
             }
+        }
+
+        void BeginSessionUploadTracking()
+        {
+            _sessionUploadTracking = deleteLocalFilesAfterUpload;
+            _reportRegisterPending = true;
+            _reportRegisterOk = false;
+            _uploadPendingCount = 0;
+            _uploadFailedCount = 0;
+            _sessionFilesToCleanup.Clear();
+            _sessionCleanupSet.Clear();
+        }
+
+        void RegisterSessionFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !_sessionCleanupSet.Add(filePath))
+            {
+                return;
+            }
+
+            _sessionFilesToCleanup.Add(filePath);
+        }
+
+        void OnUploadFinished(bool success, string filePath)
+        {
+            if (!_sessionUploadTracking)
+            {
+                return;
+            }
+
+            if (!success)
+            {
+                _uploadFailedCount++;
+            }
+
+            _uploadPendingCount--;
+            TryCleanupSessionFiles();
+        }
+
+        void TryCleanupSessionFiles()
+        {
+            if (!_sessionUploadTracking || _reportRegisterPending || _uploadPendingCount > 0)
+            {
+                return;
+            }
+
+            _sessionUploadTracking = false;
+            if (_uploadFailedCount > 0 || !_reportRegisterOk)
+            {
+                Debug.LogWarning("[UProfiler] 上传未全部成功，保留本地记录文件。");
+                return;
+            }
+
+            CleanupSessionFiles();
+        }
+
+        void CleanupSessionFiles()
+        {
+            foreach (var path in _sessionFilesToCleanup)
+            {
+                FileManager.TryDelete(path);
+            }
+
+            if (enableFrameTexture && !string.IsNullOrEmpty(captureFilePath))
+            {
+                FileManager.TryDelete(captureFilePath + ".zip");
+                FileManager.TryDeleteDirectory(captureFilePath);
+            }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (enableFunctionAnalysis)
+            {
+                var csvPath = Path.Combine(
+                    Application.persistentDataPath,
+                    ConstString.funcAnalysisPrefix + _startTime + ".csv");
+                FileManager.TryDelete(csvPath);
+            }
+#endif
+
+            _sessionFilesToCleanup.Clear();
+            _sessionCleanupSet.Clear();
+            Debug.Log("[UProfiler] 上传成功，已删除本地记录文件。");
         }
 
         [FunctionAnalysis]
@@ -327,13 +431,16 @@ namespace LemonFramework.UProfiler.Components
 
         void BeginExtendedTracking()
         {
-            _luaMemorySnapshots.Clear();
             ResourceEventTracker.Clear();
             CustomDataTracker.Clear();
+            LuaMemoryCollector.Clear();
             _moduleTimeSampler?.Dispose();
             _hardwareInfoSampler?.Dispose();
+            _resourceAutoSampler?.Dispose();
             _moduleTimeSampler = enableModuleTime ? new ModuleTimeSampler() : null;
             _hardwareInfoSampler = enableHardwareInfo ? new HardwareInfoSampler() : null;
+            _resourceAutoSampler = enableResourceManagement ? new ResourceManagementAutoSampler() : null;
+            _resourceAutoSampler?.Begin();
         }
 
         void EndExtendedTracking()
@@ -342,11 +449,14 @@ namespace LemonFramework.UProfiler.Components
             _moduleTimeSampler = null;
             _hardwareInfoSampler?.Dispose();
             _hardwareInfoSampler = null;
+            _resourceAutoSampler?.Dispose();
+            _resourceAutoSampler = null;
         }
 
         void ExtendedReportsReport()
         {
             var totalFrames = Math.Max(1, _frameIndex - ignoreFrameCount);
+            _resourceAutoSampler?.End(totalFrames);
             UploadSessionReporter.WriteExtendedReports(
                 _startTime,
                 fileExt,
@@ -354,10 +464,10 @@ namespace LemonFramework.UProfiler.Components
                 enableModuleTime,
                 enableHardwareInfo,
                 enableExtendedReports,
+                enableLuaMemory,
                 _moduleTimeSampler,
                 _hardwareInfoSampler,
                 _renderInfos,
-                _luaMemorySnapshots,
                 out var files);
 
             foreach (var path in files)
@@ -587,6 +697,17 @@ namespace LemonFramework.UProfiler.Components
 
         void UploadFile(string filePath)
         {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                return;
+            }
+
+            if (_sessionUploadTracking)
+            {
+                RegisterSessionFile(filePath);
+                _uploadPendingCount++;
+            }
+
             if (Config.UseFtpUpload)
             {
                 FileFtpUploadManager.UploadFile(filePath, (sender, e) =>
@@ -608,7 +729,12 @@ namespace LemonFramework.UProfiler.Components
                     }
 
                     UploadTips.text = $"Uploading, progress {e.ProgressPercentage}%";
-                }, (sender, e) => { Debug.Log($"File Uploaded :{e.Result}"); });
+                }, (sender, e) =>
+                {
+                    var success = e.Error == null && !e.Cancelled;
+                    Debug.Log(success ? $"File Uploaded: {filePath}" : $"Upload failed: {e.Error?.Message}");
+                    OnUploadFinished(success, filePath);
+                });
                 return;
             }
 
@@ -633,6 +759,8 @@ namespace LemonFramework.UProfiler.Components
                 {
                     Debug.LogError($"Upload failed: {error}");
                 }
+
+                OnUploadFinished(success, filePath);
             }));
         }
 
@@ -691,6 +819,11 @@ namespace LemonFramework.UProfiler.Components
                         };
                         uprofilerInfos.uProfilerInfoList.Add(uprofilerInfo);
                         ResourceEventTracker.SetCurrentFrame(relativeIndex);
+                        if (enableResourceManagement && _resourceAutoSampler != null)
+                        {
+                            _resourceAutoSampler.Sample(relativeIndex);
+                        }
+
                         if (enableModuleTime && _moduleTimeSampler != null && _moduleTimeSampler.IsSupported)
                         {
                             _moduleTimeSampler.Sample(relativeIndex);
@@ -701,10 +834,9 @@ namespace LemonFramework.UProfiler.Components
                             _hardwareInfoSampler.Sample(relativeIndex);
                         }
 
-                        var luaSnapshot = LuaMemoryProvider.TryBuildSnapshot(relativeIndex);
-                        if (luaSnapshot != null)
+                        if (enableLuaMemory)
                         {
-                            _luaMemorySnapshots.Add(luaSnapshot);
+                            LuaMemoryProvider.Collect(relativeIndex);
                         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR

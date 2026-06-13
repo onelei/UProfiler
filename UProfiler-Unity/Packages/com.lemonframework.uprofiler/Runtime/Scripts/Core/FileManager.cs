@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text;
 
@@ -76,6 +77,46 @@ namespace LemonFramework.UProfiler.Core
         public static bool WriteToFile(string filePath, string context)
         {
             return WriteToFile(filePath, context, Encoding.Default);
+        }
+
+        public static void TryDelete(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[UProfiler] Failed to delete file: {path}\n{ex.Message}");
+            }
+        }
+
+        public static void TryDeleteDirectory(string dirPath)
+        {
+            if (string.IsNullOrEmpty(dirPath))
+            {
+                return;
+            }
+
+            try
+            {
+                if (Directory.Exists(dirPath))
+                {
+                    Directory.Delete(dirPath, true);
+                }
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[UProfiler] Failed to delete directory: {dirPath}\n{ex.Message}");
+            }
         }
 
         private static bool WriteToFile(string filePath, string context, Encoding encoding)

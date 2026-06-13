@@ -160,7 +160,6 @@
   function buildFrameMarkerSeries(xValues) {
     return {
       id: 'frame-marker',
-      name: '__frameMarker__',
       type: 'line',
       data: (xValues || []).map(function () { return 0; }),
       symbol: 'none',
@@ -168,6 +167,8 @@
       itemStyle: { opacity: 0 },
       emphasis: { disabled: true },
       silent: true,
+      legendHoverLink: false,
+      tooltip: { show: false },
       z: 20,
       animation: false,
       markLine: {
@@ -186,6 +187,16 @@
     var series = option.series || [];
     for (var i = 0; i < series.length; i++) {
       if (series[i].id === 'frame-marker') {
+        if (series[i].name) {
+          chart.setOption({
+            series: [{
+              id: 'frame-marker',
+              name: '',
+              tooltip: { show: false },
+              legendHoverLink: false
+            }]
+          });
+        }
         return;
       }
     }
@@ -1646,6 +1657,38 @@
 
   function initChartsInPanel(panelEl) {
     schedulePanelCharts(panelEl);
+    initLuaMemoryCharts(panelEl);
+  }
+
+  async function initLuaMemoryCharts(root) {
+    var payload = window.luaMemoryPayload;
+    if (!payload || !payload.curves || !payload.curves.length) return;
+    var scope = root || document;
+    var nodes = scope.querySelectorAll('.lua-curve-chart[data-lua-curve]:not([data-initialized="1"])');
+    if (!nodes.length) return;
+    var echarts = await loadEcharts();
+    nodes.forEach(function (el) {
+      var label = el.dataset.luaCurve;
+      var curve = payload.curves.find(function (item) { return item.label === label; });
+      if (!curve || !curve.frames || !curve.frames.length) {
+        el.innerHTML = '<div class="chart-loading">暂无数据</div>';
+        el.dataset.initialized = '1';
+        return;
+      }
+      el.dataset.initialized = '1';
+      el.innerHTML = '';
+      var chart = echarts.init(el);
+      chart.setOption({
+        animation: false,
+        grid: { left: 42, right: 10, top: 10, bottom: 22 },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: curve.frames.map(String), boundaryGap: false },
+        yAxis: { type: 'value', name: curve.unit || '' },
+        series: [{ type: 'line', data: curve.values, showSymbol: false, lineStyle: { width: 1.5 } }]
+      });
+      chartInstances.push(chart);
+      window.addEventListener('resize', function () { chart.resize(); });
+    });
   }
 
   function activatePanel(panelId, options) {

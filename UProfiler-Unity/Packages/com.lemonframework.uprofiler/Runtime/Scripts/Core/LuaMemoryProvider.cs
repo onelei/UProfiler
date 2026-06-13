@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace LemonFramework.UProfiler.Core
 {
@@ -11,9 +9,39 @@ namespace LemonFramework.UProfiler.Core
 
         public static SnapshotDelegate SnapshotHandler { get; set; }
 
-        public static LuaMemoryUploadData TryBuildSnapshot(int frameIndex)
+        public static void RegisterLuaEnv(object luaEnv)
         {
-            return SnapshotHandler?.Invoke(frameIndex);
+            LuaMemoryAutoProbe.RegisterLuaEnv(luaEnv);
+        }
+
+        public static void RecordMetrics(
+            int frameIndex,
+            double luaHeapKb,
+            int tableCount,
+            int functionCount,
+            int userdataCount)
+        {
+            LuaMemoryCollector.RecordMetrics(frameIndex, luaHeapKb, tableCount, functionCount, userdataCount);
+        }
+
+        public static void Collect(int frameIndex)
+        {
+            var snapshot = SnapshotHandler?.Invoke(frameIndex);
+            if (snapshot != null)
+            {
+                LuaMemoryCollector.MergeSnapshot(snapshot);
+                return;
+            }
+
+            if (LuaMemoryAutoProbe.TrySample(
+                    frameIndex,
+                    out var heapKb,
+                    out var tableCount,
+                    out var functionCount,
+                    out var userdataCount))
+            {
+                LuaMemoryCollector.RecordMetrics(frameIndex, heapKb, tableCount, functionCount, userdataCount);
+            }
         }
     }
 }

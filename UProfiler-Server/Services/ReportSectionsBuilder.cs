@@ -197,9 +197,7 @@ public static class ReportSectionsBuilder
 
     public static string BuildSceneManagementSection(ReportDataContext data)
     {
-        var hint = data.SceneManagement.HasSceneInfo
-            ? "<p class=\"panel-hint muted\">游戏运行过程中小于100帧的场景已隐藏。Unity 上传 <code>sceneInfo_</code> 后可显示真实场景分段。</p>"
-            : "<p class=\"panel-hint muted\">未检测到 <code>sceneInfo_</code> 上传，以下为整段测试的合并视图。Unity 上传场景切换数据后可显示真实场景名与分段（格式见 todo.md）。</p>";
+        var hint = BuildSceneManagementHint(data.SceneManagement);
 
         return $"""
 <section id="scene-management" class="section report-panel" data-panel="scene-management">
@@ -612,7 +610,7 @@ public static class ReportSectionsBuilder
         }
         else
         {
-            sb.Append("<p class=\"muted\">LUA堆内存 / Table数量 / Function数量 / Userdata数量 需 Unity 上传 <code>luaMemory_</code>。</p>");
+            sb.Append("<p class=\"muted\">未检测到 <code>luaMemory_</code> 数据。若项目使用 xLua/SLua，请在运行时注册 <code>LuaMemoryProvider</code> 或调用 <code>LuaMemoryProvider.RegisterLuaEnv(luaEnv)</code> 后重新采集。</p>");
             sb.Append("<div class=\"uwa-metric-grid\" data-draggable-grid>");
             foreach (var label in new[] { "LUA堆内存", "Table数量", "Function数量", "Userdata数量" })
             {
@@ -1041,7 +1039,8 @@ public static class ReportSectionsBuilder
 
         if (eventList.Count == 0)
         {
-            sb.Append("<p class=\"muted\">该细分项需 Unity 上传 <code>resourceManagement_</code> 事件流（见 todo.md）。</p></section>");
+            sb.Append("<p class=\"muted\">暂无资源事件数据。请确认 Unity 端已启用 Resource Management 采集（UProfilerHost.enableResourceManagement），")
+                .Append("或在 Resources / AssetBundle 封装处调用 ResourceEventTracker。</p></section>");
             return sb.ToString();
         }
 
@@ -1119,6 +1118,32 @@ public static class ReportSectionsBuilder
 <script type="application/json" id="logData">{logJson}</script>
 </section>
 """;
+    }
+
+    static string BuildSceneManagementHint(SceneManagementPayload scene)
+    {
+        if (!scene.HasSceneInfo)
+        {
+            return "<p class=\"panel-hint muted\">未检测到 <code>sceneInfo_</code> 上传，以下为整段测试的合并视图。Unity 上传场景切换数据后可显示真实场景名与分段。</p>";
+        }
+
+        if (scene.Scenes.Count == 0)
+        {
+            return "<p class=\"panel-hint muted\">已上传 <code>sceneInfo_</code>（共 "
+                + scene.RawSceneCount
+                + " 个分段），但均不足 100 帧，按 UWA 规则已全部隐藏。请延长各场景停留时间或切换更多场景。</p>";
+        }
+
+        if (scene.HiddenShortSceneCount > 0)
+        {
+            return "<p class=\"panel-hint muted\">游戏运行过程中小于 100 帧的场景已隐藏（共 "
+                + scene.HiddenShortSceneCount
+                + " 个）。当前显示 "
+                + scene.Scenes.Count
+                + " 个场景分段。</p>";
+        }
+
+        return string.Empty;
     }
 
     static string BuildSceneOverviewTableRows(IReadOnlyList<SceneTableRow> scenes)

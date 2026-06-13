@@ -37,6 +37,7 @@ namespace LemonFramework.UProfiler.Core
         };
 
         readonly List<(string key, ProfilerRecorder recorder)> _recorders = new List<(string, ProfilerRecorder)>();
+        readonly Dictionary<string, string> _activeMarkerNames = new Dictionary<string, string>();
         readonly ProfilerRecorder _playerLoopRecorder;
 #endif
 
@@ -68,7 +69,8 @@ namespace LemonFramework.UProfiler.Core
             string key,
             ProfilerCategory category,
             string[] markers,
-            List<(string key, ProfilerRecorder recorder)> recorders)
+            List<(string key, ProfilerRecorder recorder)> recorders,
+            Dictionary<string, string> activeMarkerNames)
         {
             foreach (var marker in markers)
             {
@@ -76,6 +78,7 @@ namespace LemonFramework.UProfiler.Core
                 if (recorder.Valid)
                 {
                     recorders.Add((key, recorder));
+                    activeMarkerNames[key] = marker;
                     return;
                 }
             }
@@ -83,7 +86,7 @@ namespace LemonFramework.UProfiler.Core
 
         void TryAddRecorder(string key, ProfilerCategory category, string[] markers)
         {
-            TryAddRecorder(key, category, markers, _recorders);
+            TryAddRecorder(key, category, markers, _recorders, _activeMarkerNames);
         }
 
         static double RecorderMs(ProfilerRecorder recorder)
@@ -96,6 +99,38 @@ namespace LemonFramework.UProfiler.Core
             return recorder.LastValue / 1_000_000.0;
         }
 #endif
+
+        public List<FuncAnalysisInfo> BuildSyntheticFuncAnalysis()
+        {
+            var list = new List<FuncAnalysisInfo>();
+#if UNITY_2020_1_OR_NEWER
+            foreach (var (key, _) in _recorders)
+            {
+                if (!Data.series.TryGetValue(key, out var values) || values.Count == 0)
+                {
+                    continue;
+                }
+
+                var avgMs = values.Average();
+                if (avgMs <= 0.001)
+                {
+                    continue;
+                }
+
+                _activeMarkerNames.TryGetValue(key, out var markerName);
+                list.Add(new FuncAnalysisInfo
+                {
+                    name = string.IsNullOrEmpty(markerName) ? key : markerName,
+                    averageTime = (float)Math.Round(avgMs, 2),
+                    useTime = (float)Math.Round(avgMs * values.Count / 1000.0, 4),
+                    calls = values.Count,
+                    memory = 0,
+                    averageMemory = 0
+                });
+            }
+#endif
+            return list;
+        }
 
         public void Sample(int frameIndex)
         {

@@ -280,6 +280,8 @@ public sealed class SceneOverviewBarRow
 public sealed class SceneManagementPayload
 {
     public bool HasSceneInfo { get; init; }
+    public int RawSceneCount { get; init; }
+    public int HiddenShortSceneCount { get; init; }
     public List<FrameTimePoint> FrameTimes { get; init; } = new();
     public List<SceneTableRow> Scenes { get; init; } = new();
     public List<SceneOverviewBarRow> OverviewBars { get; init; } = new();
