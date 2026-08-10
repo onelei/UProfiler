@@ -18,8 +18,30 @@ namespace LemonFramework.UProfiler.Components
         [Header("Capture frame screenshots")] public bool enableFrameTexture = true;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        [Header("Function analysis (requires IL inject via Hook menu)")]
+        [Header("Function analysis ([FunctionAnalysis] IL hook + funcAnalysis_ upload)")]
         public bool enableFunctionAnalysis = true;
+
+        static UProfilerHost _activeHost;
+
+        public static bool IsFunctionAnalysisEnabled
+        {
+            get
+            {
+                if (_activeHost != null)
+                    return _activeHost.enableFunctionAnalysis;
+
+                if (Application.isPlaying)
+                    return false;
+
+                var host = FindAnyHost();
+                return host == null || host.enableFunctionAnalysis;
+            }
+        }
+
+        static UProfilerHost FindAnyHost()
+        {
+            return FindObjectOfType<UProfilerHost>(true);
+        }
 #endif
 
         [Header("Mobile power / battery stats (Android)")]
@@ -142,6 +164,13 @@ namespace LemonFramework.UProfiler.Components
         //private ProfilerRecorder mainThreadTimeRecord;
 #endif
 
+        void OnEnable()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            _activeHost = this;
+#endif
+        }
+
         void Awake()
         {
             Application.targetFrameRate = 60;
@@ -178,7 +207,7 @@ namespace LemonFramework.UProfiler.Components
                 }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                if (enableFunctionAnalysis && UProfilerSettings.IsFunctionHookEnabled)
+                if (enableFunctionAnalysis)
                     funcAnalysisFilePath =
                         $"{Application.persistentDataPath}/{ConstString.funcAnalysisPrefix}{_startTime}{fileExt}";
 #endif
@@ -246,7 +275,7 @@ namespace LemonFramework.UProfiler.Components
                 FrameRateInfosReport();
                 SceneInfoReport();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                if (enableFunctionAnalysis && UProfilerSettings.IsFunctionHookEnabled)
+                if (enableFunctionAnalysis)
                     FuncAnalysisReport();
 #endif
                 ExtendedReportsReport();
@@ -1012,6 +1041,10 @@ namespace LemonFramework.UProfiler.Components
 
         void OnDisable()
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_activeHost == this)
+                _activeHost = null;
+#endif
 #if UNITY_2020_1_OR_NEWER
             if (enableRenderInfo)
             {

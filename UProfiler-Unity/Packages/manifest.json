@@ -1,5 +1,10 @@
 {
   "dependencies": {
+    "com.tencent.puerts.core": "file:core",
+    "com.tencent.puerts.v8": "file:v8",
+    "com.tencent.puerts.nodejs": "file:nodejs",
+    "com.tencent.puerts.agent": "file:agent",
+    "com.tencent.puerts.mcp": "file:mcp",
     "com.unity.nuget.mono-cecil": "1.11.6",
     "com.unity.nuget.newtonsoft-json": "3.2.1",
     "com.unity.ide.rider": "2.0.7",

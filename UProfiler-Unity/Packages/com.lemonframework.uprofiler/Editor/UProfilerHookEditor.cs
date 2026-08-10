@@ -1,4 +1,5 @@
-﻿using LemonFramework.UProfiler.Core;
+﻿using LemonFramework.UProfiler.Components;
+using LemonFramework.UProfiler.Core;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using System;
@@ -23,9 +24,6 @@ namespace LemonFramework.UProfiler.Editor
 
         static void OnAssemblyCompilationFinished(string assemblyPath, CompilerMessage[] messages)
         {
-            if (!UProfilerSettings.IsFunctionHookEnabled)
-                return;
-
             var settings = UProfilerSettings.Instance;
             if (settings == null || !settings.autoInjectFunctionAnalysisOnCompile)
                 return;
@@ -50,7 +48,7 @@ namespace LemonFramework.UProfiler.Editor
             if (state != PlayModeStateChange.ExitingEditMode)
                 return;
 
-            if (!UProfilerSettings.IsFunctionHookEnabled)
+            if (!Components.UProfilerHost.IsFunctionAnalysisEnabled)
                 return;
 
             var injectedCount = UProfilerHookEditor.InjectFunctionAnalysisForPlayMode();
@@ -63,7 +61,6 @@ namespace LemonFramework.UProfiler.Editor
     {
         private static string AssemblyPath = Application.dataPath + "/../Library/ScriptAssemblies/Assembly-CSharp.dll";
 
-        [MenuItem("Hook/Inject All Methods (Profiler)", false, 0)]
         public static void HookInject()
         {
             if (!EnsureFunctionHookEnabled())
@@ -72,7 +69,6 @@ namespace LemonFramework.UProfiler.Editor
             AssemblyPostProcessorRun();
         }
 
-        [MenuItem("Hook/Inject [ProfilerSample] Methods", false, 1)]
         public static void HookProfilerSampleInject()
         {
             if (!EnsureFunctionHookEnabled())
@@ -81,7 +77,6 @@ namespace LemonFramework.UProfiler.Editor
             AssemblyPostProcessorRun(EAnalyzeType.PROFILESAMPLE);
         }
 
-        [MenuItem("Hook/Inject [FunctionAnalysis] Methods", false, 2)]
         public static void HookFunctionAnalysisInject()
         {
             if (!EnsureFunctionHookEnabled())
@@ -90,7 +85,6 @@ namespace LemonFramework.UProfiler.Editor
             AssemblyPostProcessorRun(EAnalyzeType.DEFINEFUNC);
         }
 
-        [MenuItem("Hook/Log All Method Entry Exit", false, 10)]
         public static void HookLogAllFunction()
         {
             if (!EnsureFunctionHookEnabled())
@@ -99,7 +93,6 @@ namespace LemonFramework.UProfiler.Editor
             AssemblyPostProcessorHookLogRun();
         }
 
-        [MenuItem("Hook/Log All Except Update OnGUI", false, 11)]
         public static void HookLogAllFunctionExceptUpdate()
         {
             if (!EnsureFunctionHookEnabled())
@@ -108,36 +101,22 @@ namespace LemonFramework.UProfiler.Editor
             AssemblyPostProcessorHookLogRun("Update", "OnGUI");
         }
 
-        [MenuItem("Hook/Print Method Timings", false, 20)]
         public static void ShowFuncAnaysics()
         {
             HookUtil.PrintMethodDatas();
         }
 
-        [MenuItem("Hook/Export Function Performance Report", false, 21)]
         public static void HookUtilsReport()
         {
             HookUtil.MethodAnalysisReport(PlayerPrefs.GetString("TestTime", ""));
         }
 
-        [MenuItem("Hook/Inject All Methods (Profiler)", true)]
-        [MenuItem("Hook/Inject [ProfilerSample] Methods", true)]
-        [MenuItem("Hook/Inject [FunctionAnalysis] Methods", true)]
-        [MenuItem("Hook/Log All Method Entry Exit", true)]
-        [MenuItem("Hook/Log All Except Update OnGUI", true)]
-        [MenuItem("Hook/Print Method Timings", true)]
-        [MenuItem("Hook/Export Function Performance Report", true)]
-        static bool ValidateHookMenus()
-        {
-            return UProfilerSettings.IsFunctionHookEnabled;
-        }
-
         static bool EnsureFunctionHookEnabled()
         {
-            if (UProfilerSettings.IsFunctionHookEnabled)
+            if (UProfilerHost.IsFunctionAnalysisEnabled)
                 return true;
 
-            Debug.LogWarning("[UProfiler] Function Hook is disabled. Enable it in UProfiler > Settings.");
+            Debug.LogWarning("[UProfiler] Function analysis is disabled. Enable it on UProfilerHost (enableFunctionAnalysis).");
             return false;
         }
 

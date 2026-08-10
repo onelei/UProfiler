@@ -80,7 +80,7 @@ namespace LemonFramework.UProfiler.Core
         {
             if (!UProfilerSettings.IsFunctionHookEnabled)
             {
-                Debug.LogWarning("[UProfiler] Function Hook is disabled. Enable it in UProfiler > Settings.");
+                Debug.LogWarning("[UProfiler] Function analysis is disabled. Enable enableFunctionAnalysis on UProfilerHost.");
                 return;
             }
 
@@ -215,7 +215,7 @@ namespace LemonFramework.UProfiler.Core
         {
             if (!UProfilerSettings.IsFunctionHookEnabled)
             {
-                Debug.LogWarning("[UProfiler] Function Hook is disabled. Enable it in UProfiler > Settings.");
+                Debug.LogWarning("[UProfiler] Function analysis is disabled. Enable enableFunctionAnalysis on UProfilerHost.");
                 return;
             }
 
@@ -223,9 +223,9 @@ namespace LemonFramework.UProfiler.Core
             {
                 Debug.LogWarning(
                     "[UProfiler] No function timing data collected.\n" +
-                    "• UProfiler → Settings: Enable Function Hook must be ON\n" +
-                    "• Enter Play mode (auto-injects [FunctionAnalysis] before Play)\n" +
-                    "• Or manually: Hook → Inject [FunctionAnalysis] Methods, then Play\n" +
+                    "• UProfilerHost → enableFunctionAnalysis must be ON\n" +
+                    "• Enter Play mode (auto-injects [FunctionAnalysis] before Play when enabled)\n" +
+                    "• Or manually: UProfiler → Profiler Settings → Advanced → Inject [FunctionAnalysis]\n" +
                     "• ProfilerSample inject does NOT fill this list; [FunctionAnalysis] methods must run first");
                 return;
             }
