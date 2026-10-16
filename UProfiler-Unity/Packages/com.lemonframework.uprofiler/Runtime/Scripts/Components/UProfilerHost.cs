@@ -1,3 +1,4 @@
+#if UPROFILER
 using LemonFramework.UProfiler.Core;
 using System;
 using System.Collections;
@@ -164,23 +165,44 @@ namespace LemonFramework.UProfiler.Components
         //private ProfilerRecorder mainThreadTimeRecord;
 #endif
 
+        static bool IsActiveBuild
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
+
         void OnEnable()
         {
+            if (!IsActiveBuild)
+                return;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             _activeHost = this;
 #endif
         }
 
+#if UNITY_2020_1_OR_NEWER
+        const ProfilerRecorderOptions RenderRecorderOptions = ProfilerRecorderOptions.StartImmediately;
+#endif
+
         void Awake()
         {
+            if (!IsActiveBuild)
+                return;
+
             Application.targetFrameRate = 60;
 #if UNITY_2020_1_OR_NEWER
             if (enableRenderInfo)
             {
-                setPassCallRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "SetPass Calls Count");
-                drawCallRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
-                verticesRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Vertices Count");
-                trianglesRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count");
+                setPassCallRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "SetPass Calls Count", 1, RenderRecorderOptions);
+                drawCallRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count", 1, RenderRecorderOptions);
+                verticesRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Vertices Count", 1, RenderRecorderOptions);
+                trianglesRecord = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count", 1, RenderRecorderOptions);
                 gcRecord = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC Reserved Memory");
             }
 #endif
@@ -411,6 +433,9 @@ namespace LemonFramework.UProfiler.Components
         [FunctionAnalysis]
         void Start()
         {
+            if (!IsActiveBuild)
+                return;
+
             btnMsg = ConstString.uProfilerBegin;
             GameObject.DontDestroyOnLoad(gameObject);
             UProfilerCallback += UProfilerCallBackFunc;
@@ -621,7 +646,8 @@ namespace LemonFramework.UProfiler.Components
             }
             else
             {
-                Debug.LogError($"Function analysis file missing: {funcAnalysisFilePath}");
+                Debug.LogWarning(
+                    $"[UProfiler] Function analysis file missing: {funcAnalysisFilePath}. No hooked samples were written.");
             }
         }
 #endif
@@ -793,14 +819,46 @@ namespace LemonFramework.UProfiler.Components
             }));
         }
 
+        public bool IsRecording => btnUProfiler;
+
+        /// <summary>Start a capture session. Same path as the on-screen button.</summary>
+        public void BeginRecord()
+        {
+            if (!IsActiveBuild || btnUProfiler)
+            {
+                return;
+            }
+
+            btnUProfiler = true;
+            btnMsg = ConstString.uProfilerActive;
+            UProfilerCallback?.Invoke(true);
+        }
+
+        /// <summary>Stop the capture session and write / upload the report.</summary>
+        public void EndRecord()
+        {
+            if (!IsActiveBuild || !btnUProfiler)
+            {
+                return;
+            }
+
+            btnUProfiler = false;
+            btnMsg = ConstString.uProfilerBegin;
+            UProfilerCallback?.Invoke(false);
+        }
+
         [HideAnalysis]
         void OnGUI()
         {
+            if (!IsActiveBuild)
+                return;
+
             if (GUI.Button(new Rect(150, 350, 200, 100), btnMsg))
             {
-                btnUProfiler = !btnUProfiler;
-                btnMsg = btnUProfiler ? ConstString.uProfilerActive : ConstString.uProfilerBegin;
-                UProfilerCallback?.Invoke(btnUProfiler);
+                if (btnUProfiler)
+                    EndRecord();
+                else
+                    BeginRecord();
             }
 
             if (btnUProfiler)
@@ -811,6 +869,9 @@ namespace LemonFramework.UProfiler.Components
         [HideAnalysis]
         void Update()
         {
+            if (!IsActiveBuild)
+                return;
+
             _frames++;
             _accumulator += Time.unscaledDeltaTime;
             _timeLeft -= Time.unscaledDeltaTime;
@@ -1058,3 +1119,4 @@ namespace LemonFramework.UProfiler.Components
         }
     }
 }
+#endif

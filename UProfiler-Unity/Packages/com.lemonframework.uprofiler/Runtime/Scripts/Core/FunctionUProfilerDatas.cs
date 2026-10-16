@@ -1,3 +1,4 @@
+#if UPROFILER
 namespace LemonFramework.UProfiler.Core
 {
     public struct FuncData
@@ -40,3 +41,4 @@ namespace LemonFramework.UProfiler.Core
         public float BeginTime;
     }
 }
+#endif

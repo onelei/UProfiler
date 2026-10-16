@@ -1,3 +1,4 @@
+#if UPROFILER
 using System;
 
 namespace LemonFramework.UProfiler.Core
@@ -31,3 +32,4 @@ namespace LemonFramework.UProfiler.Core
     {
     }
 }
+#endif

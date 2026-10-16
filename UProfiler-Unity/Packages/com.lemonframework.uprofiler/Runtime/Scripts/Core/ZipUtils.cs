@@ -1,3 +1,4 @@
+#if UPROFILER
 using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.Collections.Generic;
@@ -362,3 +363,4 @@ namespace LemonFramework.UProfiler.Core
         #endregion
     }
 }
+#endif

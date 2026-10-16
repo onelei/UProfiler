@@ -15,7 +15,9 @@
         "Mono.Cecil.Pdb.dll"
     ],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "UPROFILER"
+    ],
     "versionDefines": [],
     "noEngineReferences": false
 }

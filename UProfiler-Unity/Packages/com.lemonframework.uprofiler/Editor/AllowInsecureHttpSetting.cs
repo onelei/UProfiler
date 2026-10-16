@@ -1,3 +1,4 @@
+#if UPROFILER
 #if UNITY_EDITOR
 using UnityEditor;
 
@@ -17,4 +18,5 @@ namespace LemonFramework.UProfiler.Editor
         }
     }
 }
+#endif
 #endif

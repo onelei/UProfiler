@@ -1,13 +1,14 @@
-﻿using LemonFramework.UProfiler.Components;
+﻿#if UPROFILER
+using LemonFramework.UProfiler.Components;
 using LemonFramework.UProfiler.Core;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using UnityEditor;
-using UnityEditor.Callbacks;
 using UnityEditor.Compilation;
 using UnityEngine;
 
@@ -16,21 +17,26 @@ namespace LemonFramework.UProfiler.Editor
     [InitializeOnLoad]
     static class UProfilerHookCompilationInjector
     {
+        internal static volatile bool AutoInjectOnCompile = true;
+
         static UProfilerHookCompilationInjector()
         {
+            var settings = UProfilerSettings.Instance;
+            AutoInjectOnCompile = settings == null || settings.autoInjectFunctionAnalysisOnCompile;
             CompilationPipeline.assemblyCompilationFinished += OnAssemblyCompilationFinished;
-            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        }
+
+        internal static void SetAutoInject(bool enabled)
+        {
+            AutoInjectOnCompile = enabled;
         }
 
         static void OnAssemblyCompilationFinished(string assemblyPath, CompilerMessage[] messages)
         {
-            var settings = UProfilerSettings.Instance;
-            if (settings == null || !settings.autoInjectFunctionAnalysisOnCompile)
+            if (!AutoInjectOnCompile)
                 return;
-
             if (messages != null && messages.Any(message => message.type == CompilerMessageType.Error))
                 return;
-
             if (!UProfilerHookEditor.ShouldProcessAssemblyPath(assemblyPath))
                 return;
 
@@ -40,20 +46,7 @@ namespace LemonFramework.UProfiler.Editor
                     requestReloadOnSuccess: false,
                     out var patchedCount,
                     silentWhenNoMethods: true))
-                Debug.Log($"[UProfiler] Auto-injected [FunctionAnalysis] into {Path.GetFileName(assemblyPath)} ({patchedCount} methods).");
-        }
-
-        static void OnPlayModeStateChanged(PlayModeStateChange state)
-        {
-            if (state != PlayModeStateChange.ExitingEditMode)
-                return;
-
-            if (!Components.UProfilerHost.IsFunctionAnalysisEnabled)
-                return;
-
-            var injectedCount = UProfilerHookEditor.InjectFunctionAnalysisForPlayMode();
-            if (injectedCount > 0)
-                Debug.Log($"[UProfiler] Injected [FunctionAnalysis] before Play mode ({injectedCount} methods).");
+                Debug.Log($"[UProfiler] Injected [FunctionAnalysis] into {Path.GetFileName(assemblyPath)} ({patchedCount} methods).");
         }
     }
 
@@ -120,7 +113,10 @@ namespace LemonFramework.UProfiler.Editor
             return false;
         }
 
-        static readonly ReaderParameters DefaultReaderParameters = new ReaderParameters { ReadSymbols = false };
+        internal static int PatchFunctionAnalysis(AssemblyDefinition assembly)
+        {
+            return ProcessAssemblyByAttributeWithoutParam(assembly, typeof(FunctionAnalysisAttribute));
+        }
 
         public static void AssemblyPostProcessorRun()
         {
@@ -283,7 +279,8 @@ namespace LemonFramework.UProfiler.Editor
 
             try
             {
-                using var assembly = ReadAssemblyInMemory(assemblyPath, DefaultReaderParameters);
+                using var resolver = UProfilerAssemblyResolver.CreateForAssembly(assemblyPath);
+                using var assembly = ReadAssemblyInMemory(assemblyPath, resolver);
                 if (assembly == null)
                 {
                     Debug.LogError($"Inject failed to load assembly: {assemblyPath}");
@@ -363,11 +360,16 @@ namespace LemonFramework.UProfiler.Editor
             return true;
         }
 
-        static AssemblyDefinition ReadAssemblyInMemory(string assemblyPath, ReaderParameters readerParameters)
+        static AssemblyDefinition ReadAssemblyInMemory(string assemblyPath, BaseAssemblyResolver resolver)
         {
-            var bytes = File.ReadAllBytes(assemblyPath);
-            var stream = new MemoryStream(bytes);
-            return AssemblyDefinition.ReadAssembly(stream, readerParameters);
+            var parameters = new ReaderParameters
+            {
+                AssemblyResolver = resolver,
+                ReadSymbols = false,
+                ReadingMode = ReadingMode.Immediate,
+                InMemory = true
+            };
+            return AssemblyDefinition.ReadAssembly(new MemoryStream(File.ReadAllBytes(assemblyPath)), parameters);
         }
 
         static bool TryWriteAssembly(AssemblyDefinition assembly, string assemblyPath)
@@ -452,6 +454,23 @@ namespace LemonFramework.UProfiler.Editor
             return hasProcessed;
         }
 
+        static MethodReference ResolveHookMethod(ModuleDefinition module, string methodName)
+        {
+            foreach (var type in module.Types)
+            {
+                if (type.FullName != "LemonFramework.UProfiler.Core.HookUtil")
+                    continue;
+
+                foreach (var method in type.Methods)
+                {
+                    if (method.Name == methodName && method.Parameters.Count == 1)
+                        return method;
+                }
+            }
+
+            return module.ImportReference(typeof(HookUtil).GetMethod(methodName, new[] { typeof(string) }));
+        }
+
         static bool HasCustomAttribute(ICustomAttributeProvider provider, Type attributeType)
         {
             return provider.CustomAttributes.Any(attribute =>
@@ -507,14 +526,18 @@ namespace LemonFramework.UProfiler.Editor
                         if (IsMethodAlreadyHooked(method, attributeType))
                             continue;
 
-                        var begin = module.ImportReference(
-                            typeof(UnityEngine.Profiling.Profiler).GetMethod("BeginSample", new[] { typeof(string) }));
-                        var end = module.ImportReference(typeof(UnityEngine.Profiling.Profiler).GetMethod("EndSample"));
-
+                        MethodReference begin;
+                        MethodReference end;
                         if (attributeType == functionAnalysisType)
                         {
-                            begin = module.ImportReference(typeof(HookUtil).GetMethod("Begin", new[] { typeof(string) }));
-                            end = module.ImportReference(typeof(HookUtil).GetMethod("End", new[] { typeof(string) }));
+                            begin = ResolveHookMethod(module, "Begin");
+                            end = ResolveHookMethod(module, "End");
+                        }
+                        else
+                        {
+                            begin = module.ImportReference(
+                                typeof(UnityEngine.Profiling.Profiler).GetMethod("BeginSample", new[] { typeof(string) }));
+                            end = module.ImportReference(typeof(UnityEngine.Profiling.Profiler).GetMethod("EndSample"));
                         }
 
                         ILProcessor ilProcessor = method.Body.GetILProcessor();
@@ -598,4 +621,66 @@ namespace LemonFramework.UProfiler.Editor
             return hasProcessed;
         }
     }
+
+    static class UProfilerAssemblyResolver
+    {
+        public static DefaultAssemblyResolver CreateForAssembly(string assemblyPath)
+        {
+            var hints = new List<string>();
+            if (!string.IsNullOrEmpty(assemblyPath))
+                hints.Add(assemblyPath);
+
+            var contents = EditorApplication.applicationContentsPath;
+            if (!string.IsNullOrEmpty(contents))
+                hints.Add(Path.Combine(contents, "Managed", "UnityEngine.dll"));
+
+            return Create(hints);
+        }
+
+        public static DefaultAssemblyResolver Create(IEnumerable<string> references)
+        {
+            var resolver = new DefaultAssemblyResolver();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (references == null)
+                return resolver;
+
+            foreach (var reference in references)
+                AddReference(resolver, seen, reference);
+
+            return resolver;
+        }
+
+        static void AddReference(DefaultAssemblyResolver resolver, HashSet<string> seen, string reference)
+        {
+            if (string.IsNullOrEmpty(reference))
+                return;
+
+            var normalized = reference.Replace('\\', '/');
+            AddDirectory(resolver, seen, Directory.Exists(reference) ? reference : Path.GetDirectoryName(reference));
+
+            const string marker = "/Editor/Data/";
+            var index = normalized.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+                return;
+
+            var data = normalized.Substring(0, index) + "/Editor/Data";
+            AddDirectory(resolver, seen, Path.Combine(data, "NetStandard", "ref", "2.1.0"));
+            AddDirectory(resolver, seen, Path.Combine(data, "Managed"));
+            AddDirectory(resolver, seen, Path.Combine(data, "Managed", "UnityEngine"));
+            AddDirectory(resolver, seen, Path.Combine(data, "UnityReferenceAssemblies", "unity-4.8-api", "Facades"));
+        }
+
+        static void AddDirectory(DefaultAssemblyResolver resolver, HashSet<string> seen, string directory)
+        {
+            if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+                return;
+
+            var full = Path.GetFullPath(directory);
+            if (!seen.Add(full))
+                return;
+
+            resolver.AddSearchDirectory(full);
+        }
+    }
 }
+#endif

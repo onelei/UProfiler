@@ -1,3 +1,4 @@
+#if UPROFILER
 using System;
 using System.Collections.Generic;
 
@@ -18,3 +19,4 @@ namespace LemonFramework.UProfiler.Core
         public List<SceneSegmentData> segments = new List<SceneSegmentData>();
     }
 }
+#endif

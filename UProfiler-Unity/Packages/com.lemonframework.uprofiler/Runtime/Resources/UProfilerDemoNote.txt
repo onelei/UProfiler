@@ -1,0 +1,2 @@
+UProfiler performance demo text asset.
+Used by Resources.Load so the report can record a real load and unload.

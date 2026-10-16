@@ -1,3 +1,4 @@
+#if UPROFILER
 using LemonFramework.UProfiler.Core;
 using LemonFramework.UProfiler.Components;
 using System.IO;
@@ -71,7 +72,7 @@ namespace LemonFramework.UProfiler.Editor
                 _serializedSettings.FindProperty(nameof(UProfilerSettings.autoInjectFunctionAnalysisOnCompile)),
                 new GUIContent(
                     "Auto Inject On Compile",
-                    "Inject [FunctionAnalysis] into game assemblies after each script compile."));
+                    "While UPROFILER is defined, inject [FunctionAnalysis] during Editor and Development Build compilation."));
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -79,6 +80,7 @@ namespace LemonFramework.UProfiler.Editor
                 EditorUtility.SetDirty(_settings);
                 AssetDatabase.SaveAssets();
                 UProfilerSettings.InvalidateCache();
+                UProfilerHookCompilationInjector.SetAutoInject(_settings.autoInjectFunctionAnalysisOnCompile);
             }
             else
             {
@@ -87,9 +89,10 @@ namespace LemonFramework.UProfiler.Editor
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.HelpBox(
+                "Turn the whole package off by removing the UPROFILER scripting define.\n" +
                 "Function Analysis on/off: use UProfilerHost → enableFunctionAnalysis.\n" +
-                "• Auto-inject also runs before Enter Play (when enabled above)\n" +
-                "• Manual inject / export: expand Advanced below",
+                "Injection runs while compiling the Editor or a Development Build. Release players are not patched.\n" +
+                "Manual inject / export: expand Advanced below",
                 MessageType.Info);
         }
 
@@ -207,3 +210,4 @@ namespace LemonFramework.UProfiler.Editor
         }
     }
 }
+#endif

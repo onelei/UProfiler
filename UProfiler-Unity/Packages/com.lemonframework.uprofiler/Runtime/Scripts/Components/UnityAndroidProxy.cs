@@ -1,3 +1,4 @@
+#if UPROFILER
 using System;
 using LemonFramework.UProfiler.Core;
 using UnityEngine;
@@ -84,3 +85,4 @@ namespace LemonFramework.UProfiler.Components
 #endif
     }
 }
+#endif

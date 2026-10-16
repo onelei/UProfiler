@@ -1,3 +1,4 @@
+#if UPROFILER
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -86,7 +87,7 @@ namespace LemonFramework.UProfiler.Core
 
             if (FunctionDatas.Count <= 0)
             {
-                Debug.Log("IL inject succeeded; no samples collected yet.");
+                Debug.Log("[UProfiler] Function analysis is enabled, but no hooked calls were recorded.");
                 return;
             }
             string fileCsvName = "";
@@ -258,3 +259,4 @@ namespace LemonFramework.UProfiler.Core
 #endif
     }
 }
+#endif

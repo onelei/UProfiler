@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+#if UPROFILER
+using System.Collections.Generic;
 
 namespace LemonFramework.UProfiler.Core
 {
@@ -74,3 +75,4 @@ namespace LemonFramework.UProfiler.Core
         public const string apiCodeFramePrefix = "apiCodeFrame_";
     }
 }
+#endif

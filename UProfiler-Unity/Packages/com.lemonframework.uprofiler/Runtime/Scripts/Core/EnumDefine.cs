@@ -1,3 +1,4 @@
+#if UPROFILER
 namespace LemonFramework.UProfiler.Core
 {
     /// <summary>Function analysis inject mode.</summary>
@@ -11,3 +12,4 @@ namespace LemonFramework.UProfiler.Core
         PROFILESAMPLE
     }
 }
+#endif

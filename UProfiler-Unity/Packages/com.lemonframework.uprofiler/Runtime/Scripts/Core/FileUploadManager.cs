@@ -1,3 +1,4 @@
+#if UPROFILER
 using System;
 using System.IO;
 using System.Net;
@@ -25,3 +26,4 @@ namespace LemonFramework.UProfiler.Core
         }
     }
 }
+#endif

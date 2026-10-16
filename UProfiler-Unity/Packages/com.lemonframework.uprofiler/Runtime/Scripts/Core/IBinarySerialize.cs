@@ -1,3 +1,4 @@
+#if UPROFILER
 using System.IO;
 
 namespace LemonFramework.UProfiler.Core
@@ -8,3 +9,4 @@ namespace LemonFramework.UProfiler.Core
         void Serialize(BinaryWriter writer);
     };
 }
+#endif

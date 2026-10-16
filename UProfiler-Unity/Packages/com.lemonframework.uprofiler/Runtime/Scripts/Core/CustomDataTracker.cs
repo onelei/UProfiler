@@ -1,3 +1,4 @@
+#if UPROFILER
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -118,3 +119,4 @@ namespace LemonFramework.UProfiler.Core
         public static bool HasCodeData => CodeSegments.Count > 0;
     }
 }
+#endif
