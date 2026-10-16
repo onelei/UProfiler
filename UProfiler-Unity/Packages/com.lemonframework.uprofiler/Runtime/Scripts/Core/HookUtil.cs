@@ -100,10 +100,10 @@ namespace LemonFramework.UProfiler.Core
             {
                 fileCsvName = ConstString.funcAnalysisPrefix + testTime;
                 fileTxtName = ConstString.funcAnalysisPrefix + testTime + ConstString.textExt;
-                fileTxtName = Path.Combine(Application.persistentDataPath, fileTxtName);
+                fileTxtName = Path.Combine(ShareDatas.RecordDirectory, fileTxtName);
             }
             fileCsvName += ".csv";
-            fileCsvName = Path.Combine(Application.persistentDataPath, fileCsvName);
+            fileCsvName = Path.Combine(ShareDatas.RecordDirectory, fileCsvName);
 
             string header = "FuncName,FuncMemory/k,FuncAverageMemory/k,FuncUseTime/s,FuncAverageTime/ms,FuncCalls";
             using (StreamWriter sw = new StreamWriter(fileCsvName))

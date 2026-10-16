@@ -21,7 +21,7 @@ namespace LemonFramework.UProfiler.Core
             out List<string> filesToUpload)
         {
             filesToUpload = new List<string>();
-            var baseDir = Application.persistentDataPath;
+            var baseDir = ShareDatas.RecordDirectory;
             var funcAnalysis = ResolveFuncAnalysis(moduleTimeSampler);
             var hasModuleTime = enableModuleTime && moduleTimeSampler != null && moduleTimeSampler.Data.x.Count > 0;
 

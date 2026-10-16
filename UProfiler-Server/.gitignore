@@ -1,0 +1,10 @@
+# 只忽略本目录（UProfiler-Server）下的生成物与运行时数据
+
+# 编译输出
+bin/
+obj/
+
+# 运行时数据
+uploads/
+logs/
+reports/

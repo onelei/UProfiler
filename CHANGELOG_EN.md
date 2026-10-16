@@ -6,6 +6,15 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-10-16
+
+### Changed
+
+- Capture files for one session now go into a single folder `captureFrame_{time}`; logs, function analysis, and upload use `ShareDatas.RecordDirectory`
+- Screenshot zip includes only `img_*.png` in that folder, so performance data files stay out of the zip
+- Windows player output `UProfiler-Unity/Output/` is not versioned
+- `.gitignore` is split per project: `UProfiler-Unity` and `UProfiler-Server` each list only paths inside that folder
+
 ## [1.1.2] - 2026-06-13
 
 ### Added
@@ -91,6 +100,7 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 - Android device PSS / power consumption
 - `start.bat` / `stop.bat` scripts
 
+[1.1.3]: https://github.com/lemonframework/UProfiler/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lemonframework/UProfiler/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lemonframework/UProfiler/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lemonframework/UProfiler/compare/v1.0.2...v1.1.0

@@ -1,0 +1,28 @@
+# 只忽略本目录（UProfiler-Unity）下的生成物
+
+# Windows / 播放器出包（exe）
+Output/
+
+# Unity 生成目录
+Library/
+Temp/
+Logs/
+UserSettings/
+Obj/
+Build/
+Builds/
+MemoryCaptures/
+.gradle
+*.apk
+
+# Unity 生成的 IDE 工程文件
+.vs/
+*.csproj
+*.sln
+*.suo
+*.user
+
+# 仅本地保留
+Assets/StreamingAssets/
+Assets/StreamingAssets.meta
+Lib/

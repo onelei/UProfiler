@@ -139,7 +139,7 @@ namespace LemonFramework.UProfiler.Core
                         if (string.IsNullOrEmpty(ShareDatas.StartTimeStr))
                             ShareDatas.StartTimeStr = nowTime.Replace(" ", "_").Replace("/", "_")
                                 .Replace(":", "_");
-                        _logFilePath = Application.persistentDataPath + "/" + $"log_{ShareDatas.StartTime}.txt";
+                        _logFilePath = Path.Combine(ShareDatas.RecordDirectory, $"log_{ShareDatas.StartTime}.txt");
                     }
 
                     _logFileStream = new FileStream(_logFilePath, FileMode.Append);

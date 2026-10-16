@@ -6,6 +6,15 @@
 
 ## [未发布]
 
+## [1.1.3] - 2026-10-16
+
+### 变更
+
+- 一次采集的本地文件写入同一会话目录 `captureFrame_{时间}`，日志、函数分析和上传改为走 `ShareDatas.RecordDirectory`
+- 截图压缩只打包该目录下的 `img_*.png`，同目录的性能数据文件不再打进截图 zip
+- Windows 出包目录 `UProfiler-Unity/Output/` 不纳入版本库
+- `.gitignore` 按工程拆开：`UProfiler-Unity` 与 `UProfiler-Server` 各自只写本目录的忽略规则
+
 ## [1.1.2] - 2026-06-13
 
 ### 新增
@@ -91,6 +100,7 @@
 - Android 真机 PSS / 功耗采集
 - 启动脚本 `start.bat` / `stop.bat`
 
+[1.1.3]: https://github.com/lemonframework/UProfiler/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lemonframework/UProfiler/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lemonframework/UProfiler/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lemonframework/UProfiler/compare/v1.0.2...v1.1.0

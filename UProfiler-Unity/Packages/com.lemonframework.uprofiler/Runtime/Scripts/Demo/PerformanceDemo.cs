@@ -370,7 +370,7 @@ namespace LemonFramework.UProfiler.Demo
             CustomDataTracker.RecordFuncGroup("演示逻辑", MakeFuncRow("PerformanceDemo.TickUi", _uiMs, _uiFrames));
             CustomDataTracker.RecordFuncGroup("演示逻辑", MakeFuncRow("PerformanceDemo.TickScene", _sceneMs, _sceneFrames));
             CustomDataTracker.RecordFuncGroup("演示逻辑", MakeFuncRow("PerformanceDemo.TickLoad", _loadMs, _loadFrames));
-            Debug.Log($"[PerfDemo] 采集结束，开始写出报告。目录：{Application.persistentDataPath}");
+            Debug.Log($"[PerfDemo] 采集结束，开始写出报告。目录：{ShareDatas.RecordDirectory}");
             if (_statusText != null)
             {
                 _statusText.text = "采集结束，正在上传报告";
@@ -378,7 +378,7 @@ namespace LemonFramework.UProfiler.Demo
 
             if (_reportText != null && _host.ReportUrl != _reportText)
             {
-                _reportText.text = Application.persistentDataPath;
+                _reportText.text = ShareDatas.RecordDirectory;
             }
 
             _host.EndRecord();

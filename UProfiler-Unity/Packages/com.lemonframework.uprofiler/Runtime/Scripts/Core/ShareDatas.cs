@@ -1,5 +1,6 @@
 #if UPROFILER
 using System;
+using UnityEngine;
 
 namespace LemonFramework.UProfiler.Core
 {
@@ -10,6 +11,12 @@ namespace LemonFramework.UProfiler.Core
         public static string StartTimeStr;
         public static bool WriteLogToFile = true;
         public static bool ShowDebugLog = true;
+
+        /// <summary>本次采集的本地目录，形如 persistentDataPath/captureFrame_yyyy_MM_dd_HH_mm_ss。</summary>
+        public static string SessionDirectory;
+
+        public static string RecordDirectory =>
+            string.IsNullOrEmpty(SessionDirectory) ? Application.persistentDataPath : SessionDirectory;
 
         public static string ReportUrl => $"{Config.BaseUrl}/report_" + "{0}.html";
 

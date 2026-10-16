@@ -15,7 +15,7 @@ _ReSharper.CSharp/
 *.sln
 *.csproj
 
-# Build artifacts
+# Build artifacts at repo root
 bin/
 Bin/
 obj/
@@ -23,25 +23,9 @@ obj/
 Release/
 /netcoreapp2.0
 
-# Unity (under UProfiler-Unity/)
-UProfiler-Unity/Library/
-UProfiler-Unity/Temp/
-UProfiler-Unity/Logs/
-UProfiler-Unity/UserSettings/
-UProfiler-Unity/*.apk
-UProfiler-Unity/.gradle
-UProfiler-Unity/Assets/StreamingAssets/
-UProfiler-Unity/Assets/StreamingAssets.meta
-
-# Legacy Unity DLL stash (optional local only)
-UProfiler-Unity/Lib/
-
-# Report server runtime data
-UProfiler-Server/uploads/
-UProfiler-Server/logs/
-UProfiler-Server/reports/
-UProfiler-Server/bin/
-UProfiler-Server/obj/
+# 各工程只维护自己目录下的忽略规则：
+#   UProfiler-Unity/.gitignore
+#   UProfiler-Server/.gitignore
 
 # Legacy paths
 /Tools/

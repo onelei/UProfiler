@@ -116,6 +116,7 @@ namespace LemonFramework.UProfiler.Components
 
         //
         string captureFilePath;
+        string _sessionDir;
 
         //
         string testFilePath;
@@ -222,46 +223,35 @@ namespace LemonFramework.UProfiler.Components
                 PlayerPrefs.SetString("TestTime", _startTime);
                 PlayerPrefs.Save();
 #endif
-                if (enableFrameTexture)
-                {
-                    captureFilePath = $"{Application.persistentDataPath}/{ConstString.captureFramePrefix}{_startTime}";
-                    FileManager.CreateDir(captureFilePath);
-                }
+                BeginSessionDirectory();
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 if (enableFunctionAnalysis)
-                    funcAnalysisFilePath =
-                        $"{Application.persistentDataPath}/{ConstString.funcAnalysisPrefix}{_startTime}{fileExt}";
+                    funcAnalysisFilePath = SessionFile($"{ConstString.funcAnalysisPrefix}{_startTime}{fileExt}");
 #endif
                 if (enableLog)
-                    logFilePath = $"{Application.persistentDataPath}/{ConstString.logPrefix}{_startTime}{fileExt}";
-                deviceFilePath = $"{Application.persistentDataPath}/{ConstString.devicePrefix}{_startTime}{fileExt}";
-                testFilePath = $"{Application.persistentDataPath}/{ConstString.testPrefix}{_startTime}{fileExt}";
-                uprofilerFilePath =
-                    $"{Application.persistentDataPath}/{ConstString.uProfilerPrefix}{_startTime}{fileExt}";
-                frameRateFilePath =
-                    $"{Application.persistentDataPath}/{ConstString.frameRatefix}{_startTime}{fileExt}";
+                    logFilePath = SessionFile($"{ConstString.logPrefix}{_startTime}{fileExt}");
+                deviceFilePath = SessionFile($"{ConstString.devicePrefix}{_startTime}{fileExt}");
+                testFilePath = SessionFile($"{ConstString.testPrefix}{_startTime}{fileExt}");
+                uprofilerFilePath = SessionFile($"{ConstString.uProfilerPrefix}{_startTime}{fileExt}");
+                frameRateFilePath = SessionFile($"{ConstString.frameRatefix}{_startTime}{fileExt}");
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (enableMobileConsumptionInfo)
-                powerConsumeFilePath =
-                    $"{Application.persistentDataPath}/{ConstString.powerConsumePrefix}{_startTime}{fileExt}";
+                powerConsumeFilePath = SessionFile($"{ConstString.powerConsumePrefix}{_startTime}{fileExt}");
 #endif
                 if (enableResMemoryDistributionInfo)
                 {
                     resMemoryDistributionPath =
-                        $"{Application.persistentDataPath}/{ConstString.resMemoryDistributionPrefix}{_startTime}{fileExt}";
+                        SessionFile($"{ConstString.resMemoryDistributionPrefix}{_startTime}{fileExt}");
 #if UNITY_ANDROID && !UNITY_EDITOR
-                pssMemoryUsedFilePath =
-                    $"{Application.persistentDataPath}/{ConstString.pssMemoryPrefix}{_startTime}{fileExt}";
+                pssMemoryUsedFilePath = SessionFile($"{ConstString.pssMemoryPrefix}{_startTime}{fileExt}");
 #endif
                 }
 #if UNITY_2020_1_OR_NEWER
                 if (enableRenderInfo)
-                    renderFilePath =
-                        $"{Application.persistentDataPath}/{ConstString.renderPrefix}{_startTime}{fileExt}";
+                    renderFilePath = SessionFile($"{ConstString.renderPrefix}{_startTime}{fileExt}");
 #endif
-                sceneInfoFilePath =
-                    $"{Application.persistentDataPath}/{ConstString.sceneInfoPrefix}{_startTime}{fileExt}";
+                sceneInfoFilePath = SessionFile($"{ConstString.sceneInfoPrefix}{_startTime}{fileExt}");
                 BeginSceneTracking();
                 BeginExtendedTracking();
                 if (enableLog)
@@ -348,6 +338,19 @@ namespace LemonFramework.UProfiler.Components
             }
         }
 
+        void BeginSessionDirectory()
+        {
+            _sessionDir = Path.Combine(Application.persistentDataPath, ConstString.captureFramePrefix + _startTime);
+            FileManager.CreateDir(_sessionDir);
+            ShareDatas.SessionDirectory = _sessionDir;
+            captureFilePath = _sessionDir;
+        }
+
+        string SessionFile(string fileName)
+        {
+            return Path.Combine(_sessionDir, fileName);
+        }
+
         void BeginSessionUploadTracking()
         {
             _sessionUploadTracking = deleteLocalFilesAfterUpload;
@@ -409,21 +412,21 @@ namespace LemonFramework.UProfiler.Components
                 FileManager.TryDelete(path);
             }
 
-            if (enableFrameTexture && !string.IsNullOrEmpty(captureFilePath))
+            if (!string.IsNullOrEmpty(_sessionDir))
             {
-                FileManager.TryDelete(captureFilePath + ".zip");
-                FileManager.TryDeleteDirectory(captureFilePath);
-            }
-
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (enableFunctionAnalysis)
-            {
-                var csvPath = Path.Combine(
-                    Application.persistentDataPath,
-                    ConstString.funcAnalysisPrefix + _startTime + ".csv");
-                FileManager.TryDelete(csvPath);
-            }
+                if (enableFunctionAnalysis)
+                {
+                    FileManager.TryDelete(Path.Combine(_sessionDir, ConstString.funcAnalysisPrefix + _startTime + ".csv"));
+                }
 #endif
+                FileManager.TryDelete(Path.Combine(_sessionDir, $"{ConstString.captureFramePrefix}{_startTime}.zip"));
+                FileManager.TryDeleteDirectory(_sessionDir);
+                if (string.Equals(ShareDatas.SessionDirectory, _sessionDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    ShareDatas.SessionDirectory = null;
+                }
+            }
 
             _sessionFilesToCleanup.Clear();
             _sessionCleanupSet.Clear();
@@ -1081,12 +1084,23 @@ namespace LemonFramework.UProfiler.Components
     }
 #endif
 
-        /// <summary>Zip captured screenshots and upload.</summary>
+        /// <summary>Zip captured screenshots and upload. Performance files in the same folder stay out of the zip.</summary>
         private void ZipCaptureFiles()
         {
-            string srcFileDir = captureFilePath;
-            string zipFilePath = captureFilePath + ".zip";
-            bool zipSuccess = ZipUtils.ZipFile(srcFileDir, zipFilePath);
+            if (string.IsNullOrEmpty(_sessionDir) || !Directory.Exists(_sessionDir))
+            {
+                return;
+            }
+
+            var screenshots = Directory.GetFiles(_sessionDir, "img_*.png", SearchOption.TopDirectoryOnly);
+            if (screenshots.Length == 0)
+            {
+                Debug.LogWarning("[UProfiler] 本次没有截图，跳过截图压缩。");
+                return;
+            }
+
+            string zipFilePath = Path.Combine(_sessionDir, $"{ConstString.captureFramePrefix}{_startTime}.zip");
+            bool zipSuccess = ZipUtils.ZipFiles(screenshots, zipFilePath);
             Debug.Log($"Zipping capture folder: {zipFilePath}");
 
             if (zipSuccess)
