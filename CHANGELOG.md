@@ -6,6 +6,13 @@
 
 ## [未发布]
 
+## [1.1.4] - 2026-10-29
+
+### 修复
+
+- 停止采集后等全部文件上传完成，再通知服务端生成报告，避免日志、渲染、资源内存、截图和函数堆栈仍在上传时报告已被写死
+- 打开报告时若会话文件比 HTML 新，则重新生成，且报告响应不再被浏览器长期缓存。已上传但页面显示为空的会话，刷新后即可看到数据
+
 ## [1.1.3] - 2026-10-16
 
 ### 变更
@@ -100,6 +107,7 @@
 - Android 真机 PSS / 功耗采集
 - 启动脚本 `start.bat` / `stop.bat`
 
+[1.1.4]: https://github.com/lemonframework/UProfiler/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/lemonframework/UProfiler/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lemonframework/UProfiler/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lemonframework/UProfiler/compare/v1.1.0...v1.1.1

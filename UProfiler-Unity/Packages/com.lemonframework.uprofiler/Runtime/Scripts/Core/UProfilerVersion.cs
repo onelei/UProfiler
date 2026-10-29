@@ -3,7 +3,7 @@ namespace LemonFramework.UProfiler
 {
     public static class UProfilerVersion
     {
-        public const string Version = "1.1.3";
+        public const string Version = "1.1.4";
     }
 }
 #endif

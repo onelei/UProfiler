@@ -27,6 +27,6 @@ public static class VersionInfo
             }
         }
 
-        return "1.1.3";
+        return "1.1.4";
     }
 }

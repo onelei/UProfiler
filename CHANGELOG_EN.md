@@ -6,6 +6,13 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-10-29
+
+### Fixed
+
+- The report-ready callback now waits until every capture file has finished uploading, so logs, render info, resource memory, screenshots, and function stacks are not missing from a report written too early
+- Opening a report regenerates the HTML when a session file is newer than it, and the response is not kept in the browser cache. Refresh a session that already uploaded but still shows empty sections
+
 ## [1.1.3] - 2026-10-16
 
 ### Changed
@@ -100,6 +107,7 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 - Android device PSS / power consumption
 - `start.bat` / `stop.bat` scripts
 
+[1.1.4]: https://github.com/lemonframework/UProfiler/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/lemonframework/UProfiler/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lemonframework/UProfiler/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lemonframework/UProfiler/compare/v1.1.0...v1.1.1

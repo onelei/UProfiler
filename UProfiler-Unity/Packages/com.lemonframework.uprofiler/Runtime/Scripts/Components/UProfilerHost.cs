@@ -148,6 +148,8 @@ namespace LemonFramework.UProfiler.Components
         bool _sessionUploadTracking;
         bool _reportRegisterPending;
         bool _reportRegisterOk;
+        bool _queueingSessionUploads;
+        bool _reportNotifyStarted;
         int _uploadPendingCount;
         int _uploadFailedCount;
         readonly List<string> _sessionFilesToCleanup = new List<string>();
@@ -275,6 +277,8 @@ namespace LemonFramework.UProfiler.Components
                 Debug.Log(ConstString.uProfilerStop);
                 ShareDatas.EndTime = DateTime.Now;
                 BeginSessionUploadTracking();
+                _queueingSessionUploads = true;
+                _reportNotifyStarted = false;
                 //
                 UploadTestInfo();
                 //
@@ -318,23 +322,8 @@ namespace LemonFramework.UProfiler.Components
                     UploadFile(logFilePath);
                 }
 
-                HttpGet(string.Format(Config.ReportRecordUpdateRequestUrl, Application.identifier, _startTime),
-                    (result) =>
-                    {
-                        _reportRegisterPending = false;
-                        _reportRegisterOk = result;
-                        if (result)
-                        {
-                            if (ReportUrl != null)
-                            {
-                                ReportUrl.gameObject.SetActive(true);
-                                ReportUrl.text =
-                                    $"<a href={string.Format(ShareDatas.ReportUrl, ShareDatas.StartTimeStr)}>{string.Format(ShareDatas.ReportUrl, ShareDatas.StartTimeStr)}</a>";
-                            }
-                        }
-
-                        TryCleanupSessionFiles();
-                    });
+                _queueingSessionUploads = false;
+                TryNotifyReportReady();
             }
         }
 
@@ -372,19 +361,50 @@ namespace LemonFramework.UProfiler.Components
             _sessionFilesToCleanup.Add(filePath);
         }
 
-        void OnUploadFinished(bool success, string filePath)
+        void TryNotifyReportReady()
         {
-            if (!_sessionUploadTracking)
+            if (!_reportRegisterPending || _reportNotifyStarted || _queueingSessionUploads || _uploadPendingCount > 0)
             {
                 return;
             }
 
+            _reportNotifyStarted = true;
+            HttpGet(string.Format(Config.ReportRecordUpdateRequestUrl, Application.identifier, _startTime),
+                (result) =>
+                {
+                    _reportRegisterPending = false;
+                    _reportRegisterOk = result;
+                    if (result)
+                    {
+                        if (ReportUrl != null)
+                        {
+                            ReportUrl.gameObject.SetActive(true);
+                            ReportUrl.text =
+                                $"<a href={string.Format(ShareDatas.ReportUrl, ShareDatas.StartTimeStr)}>{string.Format(ShareDatas.ReportUrl, ShareDatas.StartTimeStr)}</a>";
+                        }
+                    }
+
+                    TryCleanupSessionFiles();
+                });
+        }
+
+        void OnUploadFinished(bool success, string filePath)
+        {
             if (!success)
             {
                 _uploadFailedCount++;
             }
 
-            _uploadPendingCount--;
+            if (_uploadPendingCount > 0)
+            {
+                _uploadPendingCount--;
+            }
+
+            if (!_queueingSessionUploads)
+            {
+                TryNotifyReportReady();
+            }
+
             TryCleanupSessionFiles();
         }
 
@@ -763,8 +783,9 @@ namespace LemonFramework.UProfiler.Components
             if (_sessionUploadTracking)
             {
                 RegisterSessionFile(filePath);
-                _uploadPendingCount++;
             }
+
+            _uploadPendingCount++;
 
             if (Config.UseFtpUpload)
             {

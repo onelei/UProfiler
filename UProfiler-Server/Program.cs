@@ -211,16 +211,17 @@ app.MapMethods("/{**path}", new[] { "GET", "POST", "PUT", "OPTIONS" }, async (Ht
             && path.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
         {
             var sessionKey = path["/report_".Length..^".html".Length];
-            if (reportGenerator.TryGetReportPath(sessionKey, out var reportPath))
-            {
-                return Results.File(reportPath, "text/html; charset=utf-8");
-            }
-
-            var files = uploadIndex.GetSessionFiles(sessionKey);
-            if (files.Count > 0)
+            if (reportGenerator.NeedsRegenerate(sessionKey))
             {
                 reportGenerator.Generate(sessionKey, null);
-                return Results.File(Path.Combine(reportDir, $"report_{sessionKey}.html"), "text/html; charset=utf-8");
+                projectCatalog.InvalidateCache();
+                Console.WriteLine($"Regenerated report: report_{sessionKey}.html");
+            }
+
+            if (reportGenerator.TryGetReportPath(sessionKey, out var reportPath))
+            {
+                context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+                return Results.File(reportPath, "text/html; charset=utf-8");
             }
 
             return Results.Content(BuildMissingReportPage(path, sessionKey), "text/html; charset=utf-8", Encoding.UTF8, (int)HttpStatusCode.NotFound);

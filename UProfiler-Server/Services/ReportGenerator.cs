@@ -29,4 +29,31 @@ public sealed class ReportGenerator
         reportPath = Path.Combine(reportDir, $"report_{sessionKey}.html");
         return File.Exists(reportPath);
     }
+
+    /// <summary>
+    /// True when uploads exist but the HTML is missing, or a session file is newer than the HTML.
+    /// The ready callback can land before the last upload, and the cached report would stay empty.
+    /// </summary>
+    public bool NeedsRegenerate(string sessionKey)
+    {
+        var files = uploadIndex.GetSessionFiles(sessionKey);
+        var reportPath = Path.Combine(reportDir, $"report_{sessionKey}.html");
+        if (!File.Exists(reportPath))
+        {
+            return files.Count > 0;
+        }
+
+        var reportTime = File.GetLastWriteTimeUtc(reportPath);
+        foreach (var file in files)
+        {
+            if (!string.IsNullOrEmpty(file.SavedPath)
+                && File.Exists(file.SavedPath)
+                && File.GetLastWriteTimeUtc(file.SavedPath) > reportTime)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
