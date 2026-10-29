@@ -627,7 +627,7 @@ namespace LemonFramework.UProfiler.Components
     void MobileConsumptionInfoReport()
     {
         bool writeRes = false;
-        if (!UseBinary)
+        if (!useBinary)
         {
             writeRes = FileManager.WriteToFile(powerConsumeFilePath, JsonUtility.ToJson(devicePowerConsumeInfos));
         }
@@ -644,7 +644,7 @@ namespace LemonFramework.UProfiler.Components
      void MobilePssMemoryUseReport()
     {
         bool writeRes = false;
-        if (!UseBinary)
+        if (!useBinary)
         {
             writeRes = FileManager.WriteToFile(pssMemoryUsedFilePath, JsonUtility.ToJson(memoryUseDatas));
         }
@@ -1101,7 +1101,7 @@ namespace LemonFramework.UProfiler.Components
     {
         unityAndroidProxy ??= new UnityAndroidProxy();
         MemoryUseData data = unityAndroidProxy.GetPssMemory(index);
-        memoryUseDatas.MemoryUsedList.Add(data);
+        memoryUseDatas.memoryUsedList.Add(data);
     }
 #endif
 

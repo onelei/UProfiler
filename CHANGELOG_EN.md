@@ -6,6 +6,12 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-10-29
+
+### Fixed
+
+- Android release player scripts compile again: power and PSS samples use the real struct fields (`UnityAndroidProxy`, `useBinary`, `memoryUsedList`), and the function-analysis switch no longer calls an editor-only API outside Development builds
+
 ## [1.1.4] - 2026-10-29
 
 ### Fixed
@@ -107,6 +113,7 @@ Chinese version: [CHANGELOG.md](CHANGELOG.md).
 - Android device PSS / power consumption
 - `start.bat` / `stop.bat` scripts
 
+[1.1.5]: https://github.com/lemonframework/UProfiler/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/lemonframework/UProfiler/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/lemonframework/UProfiler/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lemonframework/UProfiler/compare/v1.1.1...v1.1.2

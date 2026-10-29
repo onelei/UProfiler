@@ -14,7 +14,17 @@ namespace LemonFramework.UProfiler.Core
         static UProfilerSettings _cached;
 
         /// <summary>Delegates to UProfilerHost.enableFunctionAnalysis (single switch for function hook).</summary>
-        public static bool IsFunctionHookEnabled => UProfilerHost.IsFunctionAnalysisEnabled;
+        public static bool IsFunctionHookEnabled
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return UProfilerHost.IsFunctionAnalysisEnabled;
+#else
+                return false;
+#endif
+            }
+        }
 
         public static UProfilerSettings Instance
         {

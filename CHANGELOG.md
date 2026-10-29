@@ -6,6 +6,12 @@
 
 ## [未发布]
 
+## [1.1.5] - 2026-10-29
+
+### 修复
+
+- 安卓正式包编译通过：功耗和 PSS 采样改用结构体实际字段（`UnityAndroidProxy`、`useBinary`、`memoryUsedList`）；函数分析开关在非 Development 包中不再引用仅编辑器存在的接口
+
 ## [1.1.4] - 2026-10-29
 
 ### 修复
@@ -107,6 +113,7 @@
 - Android 真机 PSS / 功耗采集
 - 启动脚本 `start.bat` / `stop.bat`
 
+[1.1.5]: https://github.com/lemonframework/UProfiler/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/lemonframework/UProfiler/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/lemonframework/UProfiler/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/lemonframework/UProfiler/compare/v1.1.1...v1.1.2
